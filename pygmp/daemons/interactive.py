@@ -5,12 +5,15 @@
 """
 import inspect
 import sys
-import traceback
 from contextlib import contextmanager
 import threading
 import queue
 
 from pygmp.kernel import sockopts, data, net
+from pygmp.utils import get_logger
+
+
+_logger = get_logger(__name__)
 
 
 def main(args):
@@ -68,12 +71,10 @@ def interactive_shell():
         yield command, args
 
     except KeyboardInterrupt:
-        print("Keyboard interrupt. Exiting.")
+        _logger.warning("Keyboard interrupt. Exiting.")
         exit(0)
-    except Exception as e:
-        print("Unknown error. Please report.")
-        print(e)
-        traceback.print_exc()
+    except Exception:
+        _logger.exception("Unknown error. Please report.")
 
 
 def assert_args(fn):
@@ -93,16 +94,16 @@ def read_from_socket(sock, qu):
         while True:
             buff, _ = sock.recvfrom(6000) # FIXME - buffer size
             qu.put(_filter_ip(net.parse_ip_header(buff), buff))
-    except Exception as e:
-        print("Error in read_from_socket thread.")
-        print(e)
+    except Exception:
+        _logger.exception("Error in read_from_socket thread.  This will be ignored.")
+
 
 def _filter_ip(ip_header: data.IPHeader, buffer: bytes):
     if ip_header.protocol == data.IPProtocol.IGMP:
         return net.parse_igmp(buffer[ip_header.ihl*4:])
     if ip_header.protocol == data.IPProtocol.CONTROL:
         return net.parse_igmp_control(buffer)
-    print("warning, skipping packet...")
+    _logger.warning("warning, skipping packet...")
 
 
 @assert_args

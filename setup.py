@@ -3,7 +3,7 @@ from setuptools import setup, Extension
 
 def main():
     module1 = Extension('pygmp.kernel._kernel',
-                        sources=["./pygmp/kernel/_kernel.c", "./pygmp/kernel/_net.c", "./pygmp/kernel/_sockopts.c"],
+                        sources=["./pygmp/kernel/_kernel.c"],
                         include_dirs=["/home/jack/Documents/projects/pygmp/pygmp/kernel/"],
                         libraries=["python3.10"])
 

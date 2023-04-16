@@ -31,7 +31,7 @@ sudo python3 pygmp interactive
 
 ### Developer Quick Start
 
-Install the [task](https://taskfile.dev/installation) utility.  This utilitiy is used to standardize build and test processes.
+Install the [task](https://taskfile.dev/installation) utility.  This utility is used to standardize build and test processes.
 
 ```bash
 sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin

@@ -3,8 +3,9 @@ dist/
 build/
 pygmp.egg-info/
 
-# Ignore all .so files in the repository
+# Ignore all .so or .o files in the repository
 *.so
+*.o
 
 # python venv
 venv/

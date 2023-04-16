@@ -6,17 +6,19 @@ tasks:
     cmds:
       - task --list
 
-  build:
+  install:
     desc: Run setup.py to build the package.
     deps: [ make-venv ]
     cmds:
-      - /home/jack/Documents/projects/pygmp/venv/bin/python3 setup.py sdist
-      - sudo /home/jack/Documents/projects/pygmp/venv/bin/pip3 install ./dist/pygmp-1.0.0.tar.gz --force-reinstall
+      - ./venv/bin/python3 setup.py sdist
+      - sudo {{.USER_WORKING_DIR}}/venv/bin/pip3 install ./dist/pygmp-1.0.0.tar.gz --force-reinstall
+
   build-ext:
-    desc: Build the extension module.
+    desc: Build the extension module in-place.
     deps: [ make-venv ]
     cmds:
-      - /home/jack/Documents/projects/pygmp/venv/bin/python3 setup.py build_ext --inplace
+      - ./venv/bin/python3 setup.py build_ext --inplace --dry-run
+
   make-venv:
     cmds:
       - python3 -m pip install virtualenv
