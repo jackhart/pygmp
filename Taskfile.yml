@@ -19,6 +19,17 @@ tasks:
     cmds:
       - ./venv/bin/python3 setup.py build_ext --inplace --dry-run
 
+  test:
+    desc: Run pytests.
+    deps: [ make-venv, build-ext ]
+    cmds:
+      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 -m pytest {{.CLI_ARGS}}
+
+  setup-network:
+    desc: Setup the network namespaces for testing.
+    cmds:
+      - sudo ./network-setup.sh --overwrite
+
   make-venv:
     cmds:
       - python3 -m pip install virtualenv

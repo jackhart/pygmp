@@ -20,12 +20,11 @@ _IGMP_IP_PACKET = b'F\xc0\x00 \x00\x00@\x00\x01\x02\xeb\x14\n\x00\x00\x01\xef\x0
 
 @pytest.fixture
 def vif_a1():
-    return {"name": "a1", "address": "10.0.0.1", "ifindx": 6}
-
+    return {"name": "a1", "address": "10.0.0.1", "ifindx": 2}
 
 @pytest.fixture
 def vif_a2():
-    return {"name": "a2", "address": "20.0.0.1", "ifindx": 7}
+    return {"name": "a2", "address": "20.0.0.1", "ifindx": 3}
 
 
 @pytest.fixture
@@ -91,7 +90,7 @@ def test_add_vif(cleaned_sock, vif_a1, multicast_addr):
 
 
 def test_add_vif_by_index(cleaned_sock, vif_a1, multicast_addr):
-    vif_ctl = data.VifCtl(1, 1, 0, str(vif_a1["ifindx"]), multicast_addr)
+    vif_ctl = data.VifCtl(1, 1, 0, int(vif_a1["ifindx"]), multicast_addr)
     sockopts.add_vif(cleaned_sock, vif_ctl)
 
 

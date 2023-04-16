@@ -1,3 +1,4 @@
+import os
 from ipaddress import ip_address, IPv4Address, IPv6Address
 
 from pygmp.kernel.data import IPHeader, IGMPControl, IGMP, Interface, VIFTableEntry, MFCEntry

@@ -85,7 +85,7 @@ def test_vifctl_index(multicast_addr):
     assert vif_ctl.rmt_addr.is_multicast
 
 
-def test_mfctl():
+def test_mfctl(inaddr_str, multicast_addr):
     mfc_ctl = data.MfcCtl(inaddr_str, multicast_addr, 3, [1] * 4, 0)
     assert isinstance(mfc_ctl.origin, (IPv4Address,))
     assert isinstance(mfc_ctl.mcastgroup, (IPv4Address,))
@@ -98,7 +98,7 @@ def test_mfctl():
 
 
 def test_interface():
-    intf = data.Interface("eth0", data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, ["0.0.0.0", "192.168.2.2"])
+    intf = data.Interface("eth0", 0, data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, ["0.0.0.0", "192.168.2.2"])
     assert len(intf.flags) == 2
     assert len(intf.flags & {data.InterfaceFlags.UP, data.InterfaceFlags.MULTICAST}) == 2
     assert len(intf.addresses) == 2
