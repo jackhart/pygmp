@@ -1,0 +1,29 @@
+version: '3'
+
+tasks:
+  default:
+    desc: help
+    cmds:
+      - task --list
+
+  build:
+    desc: Run setup.py to build the package.
+    deps: [ make-venv ]
+    cmds:
+      - /home/jack/Documents/projects/pygmp/venv/bin/python3 setup.py sdist
+      - sudo /home/jack/Documents/projects/pygmp/venv/bin/pip3 install ./dist/pygmp-1.0.0.tar.gz --force-reinstall
+  build-ext:
+    desc: Build the extension module.
+    deps: [ make-venv ]
+    cmds:
+      - /home/jack/Documents/projects/pygmp/venv/bin/python3 setup.py build_ext --inplace
+  make-venv:
+    cmds:
+      - python3 -m pip install virtualenv
+      - python3 -m venv venv
+      - ./venv/bin/pip3 install setuptools wheel
+    status:
+      - '[ -d ./venv ]'
+    preconditions:
+      - sh: "which python3"
+        msg: "You must have python3"

@@ -1,0 +1,20 @@
+# Ignore the dist directory created by setup.py
+dist/
+build/
+pygmp.egg-info/
+
+# Ignore all .so files in the repository
+*.so
+
+# python venv
+venv/
+python
+
+# caches
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# IDE
+cmake-build-debug/
+.idea/

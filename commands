@@ -1,0 +1,15 @@
+
+sudo su
+export PYTHONPATH=/home/jack/Documents/projects/pygmp:$PYTHONPATH
+source venv/bin/activate
+python3 pygmp interactive
+
+Usage: add vif <index> <ttl threshold> <rate limit> <interface addr or index> <remote addr>
+add vif 0 1 0 10.0.0.1 0.0.0.0
+add vif 1 1 0 20.0.0.1 0.0.0.0
+
+Usage: add mfc <origin> <group> <parent> <ttls>
+add mfc 10.0.0.1 239.0.0.4 0 0,1
+
+Usage: add membership <multiaddr> <interface>
+add membership 239.0.0.4 20.0.0.1
