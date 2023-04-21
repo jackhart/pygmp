@@ -9,8 +9,8 @@ from contextlib import contextmanager
 import threading
 import queue
 
-from pygmp.kernel import sockopts, data, net
-from pygmp.utils import get_logger
+from pygmp import kernel, data
+from pygmp.daemons.utils import get_logger
 
 
 _logger = get_logger(__name__)
@@ -19,7 +19,7 @@ _logger = get_logger(__name__)
 def main(args):
 
     q = queue.Queue()
-    with sockopts.igmp_socket() as sock:
+    with kernel.igmp_socket() as sock:
 
         # initial setup.
         _clean(sock)
@@ -36,11 +36,11 @@ def main(args):
                     exit(0)
 
                 if command == "status:":
-                    print(f"\nMR Version: {sockopts.mrt_version(sock)}")
-                    print(f"\nPIM: {sockopts.pim_is_enabled(sock)}")
+                    print(f"\nMR Version: {kernel.mrt_version(sock)}")
+                    print(f"\nPIM: {kernel.pim_is_enabled(sock)}")
 
                 elif command == "flush":
-                    sockopts.flush(sock)
+                    kernel.flush(sock)
 
                 elif command == "list":
                     _list(*args)
@@ -93,16 +93,16 @@ def read_from_socket(sock, qu):
     try:
         while True:
             buff, _ = sock.recvfrom(6000) # FIXME - buffer size
-            qu.put(_filter_ip(net.parse_ip_header(buff), buff))
+            qu.put(_filter_ip(kernel.parse_ip_header(buff), buff))
     except Exception:
         _logger.exception("Error in read_from_socket thread.  This will be ignored.")
 
 
 def _filter_ip(ip_header: data.IPHeader, buffer: bytes):
     if ip_header.protocol == data.IPProtocol.IGMP:
-        return net.parse_igmp(buffer[ip_header.ihl*4:])
+        return kernel.parse_igmp(buffer[ip_header.ihl * 4:])
     if ip_header.protocol == data.IPProtocol.CONTROL:
-        return net.parse_igmp_control(buffer)
+        return kernel.parse_igmp_control(buffer)
     _logger.warning("warning, skipping packet...")
 
 
@@ -113,35 +113,35 @@ def _add_vif(sock, vif_index: str, ttl_threshold: str, rate_limit: str, interfac
         interface_addr = int(interface_addr)
 
     vif_ctl = data.VifCtl(int(vif_index), int(ttl_threshold), int(rate_limit), interface_addr, remote_addr)
-    sockopts.add_vif(sock, vif_ctl)
+    kernel.add_vif(sock, vif_ctl)
 
 
 @assert_args
 def _add_mfc(sock, origin: str, mcastgroup: str, parent: str, ttls: str):
     """add mfc <origin> <group> <parent> <ttls>"""
     mfc_ctl = data.MfcCtl(origin, mcastgroup, int(parent), [int(ttl) for ttl in ttls.split(",")])
-    sockopts.add_mfc(sock, mfc_ctl)
+    kernel.add_mfc(sock, mfc_ctl)
 
 
 @assert_args
 def _del_vif(sock, vif_index: str):
     """del vif <index>"""
     vif_ctl = data.VifCtl(int(vif_index))
-    sockopts.del_vif(sock, vif_ctl)
+    kernel.del_vif(sock, vif_ctl)
 
 
 @assert_args
 def _del_mfc(sock, origin: str, mcastgroup: str, parent: str):
     """del mfc <origin> <group> <parent>"""
     mfc_ctl = data.MfcCtl(origin, mcastgroup, int(parent))  # FIXME
-    sockopts.del_mfc(sock, mfc_ctl)
+    kernel.del_mfc(sock, mfc_ctl)
 
 
 @assert_args
 def _add_membership(sock, multiaddr: str, interface: str):
     """add membership <multiaddr> <interface>"""
     ip_mreq = data.IpMreq(multiaddr, interface)
-    sockopts.add_membership(sock, ip_mreq)
+    kernel.add_membership(sock, ip_mreq)
 
 
 @assert_args
@@ -190,21 +190,21 @@ def _get_subcommand_and_args(args):
     return sub_command, sub_args
 
 
-def _clean(sock: sockopts.InetRawSocketType):
-    sockopts.disable_pim(sock)
-    sockopts.enable_mrt(sock)
-    sockopts.flush(sock)
+def _clean(sock: kernel.InetRawSocketType):
+    kernel.disable_pim(sock)
+    kernel.enable_mrt(sock)
+    kernel.flush(sock)
 
 
 def _print_vifs():
     print("\n")
-    for vif in net.ip_mr_vif():
+    for vif in kernel.ip_mr_vif():
         print(vif)
 
 
 def _print_mfc():
     print("\n")
-    for mfc in net.ip_mr_cache():
+    for mfc in kernel.ip_mr_cache():
         print(mfc)
 
 

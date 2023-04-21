@@ -3,7 +3,7 @@ from ipaddress import IPv4Address, ip_address
 
 import pytest
 
-from pygmp.kernel import data
+from pygmp import data
 
 
 @pytest.fixture

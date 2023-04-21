@@ -1,21 +1,13 @@
 from setuptools import setup, Extension
-
+from pathlib import Path
 
 def main():
-    module1 = Extension('pygmp.kernel._kernel',
-                        sources=["./pygmp/kernel/_kernel.c"],
-                        include_dirs=["/home/jack/Documents/projects/pygmp/pygmp/kernel/"],
+    module1 = Extension('pygmp._kernel',
+                        sources=["./pygmp/_kernel.c"],
+                        include_dirs=[Path.cwd().joinpath("pygmp")],
                         libraries=["python3.10"])
 
-
-    setup(name="pygmp",
-          packages=['pygmp'],
-          version="1.0.0",
-          description="Python tools for working with the Multicast Routing Table in Linux.",
-          author="Jack Hart",
-          author_email="jackhart0508@gmail.com",
-          ext_modules=[module1])
-
+    setup(ext_modules=[module1])
 
 if __name__ == "__main__":
     main()

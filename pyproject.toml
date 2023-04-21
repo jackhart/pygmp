@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygmp"
+version = "0.0.1"
+description = "Linux Multicast Routing Utilities."
+readme = "README.md"
+authors = [
+    {name = "Jack Hart", email = "jackhart0508@gmail.com"}
+]
+license = {file = "./LICENSE"}
+
+[project.urls]
+Source = "https://github.com/jackhart/pygmp"
+# Documentation = "TODO"
+
+[options]
+packages = ["pygmp"]

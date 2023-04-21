@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+unicast_interfaces = None
+multicast_interfaces = None
+
+
 
 @dataclass
 class Config:
@@ -8,4 +12,4 @@ class Config:
 
 class Vifs:
     name: str
-    address: str | None = None
+    parser: str | None = None

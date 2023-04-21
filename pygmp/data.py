@@ -5,7 +5,7 @@ from dataclasses import dataclass, fields
 from ipaddress import ip_address, IPv4Address, IPv6Address
 from typing import get_args
 
-from pygmp.kernel import _kernel
+from pygmp import _kernel
 
 
 @dataclass
@@ -197,6 +197,20 @@ class VIFTableEntry(Base):
     flags: int
     local_addr: IPv4Address | IPv6Address | str
     remote_addr: IPv4Address | IPv6Address | str
+
+
+
+@dataclass
+class VifCtl(Base):
+    """Used in MRT_ADD_VIF and MRT_DEL_VIF
+        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L61
+    """
+    vifi: int  # VIF index
+    threshold: int = 1  # TTL threshold - minimum TTL packet must have to be forwarded on vif.  Typically 1
+    rate_limit: int = 0  # Rate limiter values (NI)
+    lcl_addr: IPv4Address | IPv6Address | str | int = ip_address("0.0.0.0")  # Local interface address or index
+    rmt_addr: IPv4Address | IPv6Address | str = ip_address("0.0.0.0")  # Remote address (NI)
+
 
 
 @dataclass
