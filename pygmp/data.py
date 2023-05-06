@@ -108,8 +108,11 @@ class InterfaceFlags(IntEnum):
 
 @dataclass
 class IpMreq(Base):
-    """Request structure for multicast socket ops.
-        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/in.h#L177
+    """Request structure for multicast socket operations.
+
+        Attributes:
+            multiaddr (IPv4Address | IPv6Address | str): IP multicast address of the group.
+            interface (IPv4Address | IPv6Address | str): Local IP address of the interface.
     """
     format = "4s 4s"
     multiaddr: IPv4Address | IPv6Address | str  # IP multicast address of group
@@ -118,8 +121,14 @@ class IpMreq(Base):
 
 @dataclass
 class VifReq(Base):
-    """Used in SIOCGETVIFCNT ioctl call.
-        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L101
+    """Data class for Virtual Interface (VIF) information used in SIOCGETVIFCNT ioctl call.
+
+        Attributes:
+            vifi (int): VIF index.
+            icount (int, optional): Input packet count. Defaults to 0.
+            ocount (int, optional): Output packet count. Defaults to 0.
+            ibytes (int, optional): Input byte count. Defaults to 0.
+            obytes (int, optional): Output byte count. Defaults to 0.
     """
     format = "HLLLL"
     vifi: int  # VIF index
@@ -131,8 +140,14 @@ class VifReq(Base):
 
 @dataclass
 class SGReq(Base):
-    """ 'Source-Group Request' - Used in SIOCGETSGCNT ioctl call.
-        Linux struct: https://github.com/torvalds/linux/blob/master/net/ipv4/ipmr.c
+    """Data class for 'Source-Group Request', used in SIOCGETSGCNT ioctl call.
+
+        Attributes:
+            src (IPv4Address | IPv6Address | str): Source IP address.
+            grp (IPv4Address | IPv6Address | str): Group IP address.
+            pktcnt (int, optional): Packet count. Defaults to 0.
+            bytecnt (int, optional): Byte count. Defaults to 0.
+            wrong_if (int, optional): Wrong interface count. Defaults to 0.
     """
     format = "4s 4s LLL"
     src: IPv4Address | IPv6Address | str
@@ -143,21 +158,15 @@ class SGReq(Base):
 
 
 @dataclass
-class VifCtl(Base):
-    """Used in MRT_ADD_VIF and MRT_DEL_VIF
-        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L61
-    """
-    vifi: int  # VIF index
-    threshold: int = 1  # TTL threshold - minimum TTL packet must have to be forwarded on vif.  Typically 1
-    rate_limit: int = 0  # Rate limiter values (NI)
-    lcl_addr: IPv4Address | IPv6Address | str | int = ip_address("0.0.0.0")  # Local interface address or index
-    rmt_addr: IPv4Address | IPv6Address | str = ip_address("0.0.0.0")  # Remote address (NI)
-
-
-@dataclass
 class MfcCtl(Base):
-    """Used in MRT_ADD_MFC and MRT_DEL_MFC calls.
-        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L80
+    """Data class for Multicast Forwarding Cache (MFC) control, used in MRT_ADD_MFC and MRT_DEL_MFC calls.
+
+        Attributes:
+            origin (IPv4Address | IPv6Address | str): Originating IP address, used in Source-Specific Multicast (SSM).
+            mcastgroup (IPv4Address | IPv6Address | str): Multicast group address.
+            parent (int): Parent VIF index, where the packet arrived (incoming interface index).
+            ttls (list): List of minimum TTL thresholds for forwarding on VIFs.
+            expire (int, optional): Time in seconds after which the cache entry will be deleted. Defaults to 0.
     """
     origin: IPv4Address | IPv6Address | str  # Originating ip - used in source-specific multicast (SSM)
     mcastgroup: IPv4Address | IPv6Address | str  # Multicast address
@@ -168,21 +177,38 @@ class MfcCtl(Base):
 
 @dataclass
 class Interface(Base):
+    """Data class representing a network interface.
+
+        Attributes:
+            name (str): Interface name.
+            index (int): Interface index.
+            flags (set[InterfaceFlags] | int): Interface flags.
+            addresses (list[str], optional): List of IP addresses associated with the interface. Defaults to empty list.
+    """
     name: str
     index: int
     flags: set[InterfaceFlags] | int
-    addresses: list[str]
+    addresses: list[str] = None
 
     def __post_init__(self):
         super().__post_init__()
         if isinstance(self.flags, int):
             self.flags = InterfaceFlags.from_value(self.flags)
+        if self.addresses is None:
+            self.addresses = []
 
 
 @dataclass
 class IGMPControl(Base):
-    """The format sent from kernel over the IGMP socket.
-        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L112
+    """Data class representing the format sent from kernel over the IGMP socket.
+
+        Attributes:
+            msgtype (ControlMsgType): Control message type.
+            mbz (int): Must be zero.
+            vif (int): Low 8 bits of VIF number.
+            vif_hi (int): High 8 bits of VIF number.
+            im_src (IPv4Address | IPv6Address | str): IP address of source of packet.
+            im_dst (IPv4Address | IPv6Address | str): IP address of destination of packet.
     """
     msgtype: ControlMsgType  # control message type
     mbz: int  # Must be zero
@@ -194,31 +220,60 @@ class IGMPControl(Base):
 
 @dataclass
 class IPHeader(Base):
+    """Data class representing an IP header.
+
+        Attributes:
+            version (IPVersion): IP version.
+            ihl (int): Internet Header Length.
+            tos (int): Type of service.
+            tot_len (int): Total length.
+            id (int): Identification.
+            frag_off (int): Fragment offset.
+            ttl (int): Time to live.
+            protocol (IPProtocol): Protocol.
+            check (int): Header checksum.
+            src_addr (IPv4Address | IPv6Address | str): Source address.
+            dst_addr (IPv4Address | IPv6Address | str): Destination address.
+"""
     version: IPVersion
     ihl: int
-    tos: int  # Type of service
-    tot_len: int  # Total length
-    id: int  # Identification
-    frag_off: int  # fragment offset
-    ttl: int  # Time to live
-    protocol: IPProtocol  # Protocol
-    check: int  # Header checksum
-    src_addr: IPv4Address | IPv6Address | str   # Source address
-    dst_addr: IPv4Address | IPv6Address | str   # Destination address
+    tos: int
+    tot_len: int
+    id: int
+    frag_off: int
+    ttl: int
+    protocol: IPProtocol
+    check: int
+    src_addr: IPv4Address | IPv6Address | str
+    dst_addr: IPv4Address | IPv6Address | str
 
 
 @dataclass
 class IGMP(Base):
-    """The format of an IGMP message in an IP packets payload."""
-    type : IGMPType  # IGMP version
+    """Data class representing the format of an IGMP message in an IP packet's payload.
+
+        Attributes:
+            type (IGMPType): IGMP version.
+            max_response_time (int): Maximum response time.
+            checksum (int): Checksum.
+            group (IPv4Address | str): Group address.
+    """
+    type : IGMPType
     max_response_time: int
-    checksum: int  # Checksum
-    group: IPv4Address | str  # Group address
+    checksum: int
+    group: IPv4Address | str
 
 
 @dataclass
 class IGMPv3MembershipReport(Base):
-    """ """
+    """Data class representing the format of an IGMP message in an IP packet's payload.
+
+        Attributes:
+            type (IGMPType): IGMP version.
+            max_response_time (int): Maximum response time.
+            checksum (int): Checksum.
+            group (IPv4Address | str): Group address.
+    """
     type: IGMPType
     checksum: int
     num_records: int
@@ -231,7 +286,15 @@ class IGMPv3MembershipReport(Base):
 
 @dataclass
 class IGMPv3Record(Base):
-    """ """
+    """Data class representing an IGMPv3 Record used in IGMPv3 Membership Report messages.
+
+        Attributes:
+            type (IGMPv3RecordType): IGMPv3 record type.
+            auxwords (int): Auxiliary words.
+            nsrcs (int): Number of sources.
+            mca (IPv4Address | str): Multicast address.
+            src_list (list[IPv4Address | str]): Source list.
+    """
     type: IGMPv3RecordType
     auxwords: int
     nsrcs: int
@@ -244,7 +307,20 @@ class IGMPv3Record(Base):
 
 @dataclass
 class IGMPv3Query(Base):
-    """ """
+    """Data class representing an IGMPv3 Query.
+
+        Attributes:
+            type (IGMPType): IGMP type.
+            max_response_time (int): Maximum response time.
+            checksum (int): Checksum.
+            group (IPv4Address | str): Group address.
+            qqic (int): Querier's Query Interval Code.
+            suppress (bool): Suppress flag.
+            querier_robustness (int): Querier robustness variable.
+            querier_query_interval (int): Querier query interval.
+            num_sources (int): Number of sources.
+            src_list (list[IPv4Address | str]): Source list.
+    """
     type: IGMPType
     max_response_time: int
     checksum: int
@@ -263,7 +339,19 @@ class IGMPv3Query(Base):
 
 @dataclass
 class VIFTableEntry(Base):
-    """The format of an entry in the VIF table at /proc/net/ip_mr_vif."""
+    """Data class representing an entry in the VIF table at /proc/net/ip_mr_vif.
+
+        Attributes:
+            index (int): VIF index.
+            interface (str): Interface name.
+            bytes_in (int): Number of bytes received.
+            pkts_in (int): Number of packets received.
+            bytes_out (int): Number of bytes transmitted.
+            pkts_out (int): Number of packets transmitted.
+            flags (int): Flags.
+            local_addr (IPv4Address | IPv6Address | str): Local IP address.
+            remote_addr (IPv4Address | IPv6Address | str): Remote IP address.
+    """
     index: int
     interface: str
     bytes_in: int
@@ -277,13 +365,14 @@ class VIFTableEntry(Base):
 
 @dataclass
 class VifCtl(Base):
-    """Used in MRT_ADD_VIF and MRT_DEL_VIF.  Based off the Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L61
+    """Data class used in MRT_ADD_VIF and MRT_DEL_VIF.
 
-        :param vifi: VIF index
-        :param lcl_addr: Local interface address or index
-        :param threshold: TTL threshold - minimum TTL packet must have to be forwarded on vif.  Typically, 1
-        :param rate_limit Rate limiter values (Not Implemented in Linux)
-        :param rmt_addr: IPIP tunnel address
+        Attributes:
+            vifi (int): VIF index.
+            lcl_addr (IPv4Address | IPv6Address | str | int): Local interface address or index.
+            rmt_addr (IPv4Address | IPv6Address | str, optional): IPIP tunnel address. Defaults to ip_address("0.0.0.0").
+            threshold (int, optional): TTL threshold. Defaults to 1.
+            rate_limit (int, optional): Rate limiter values (Not Implemented in Linux). Defaults to 0.
     """
     vifi: int
     lcl_addr: IPv4Address | IPv6Address | str | int
@@ -294,7 +383,17 @@ class VifCtl(Base):
 
 @dataclass
 class MFCEntry(Base):
-    """The format of an entry in the MFC table at /proc/net/ip_mr_cache."""
+    """Data class representing an entry in the MFC table at /proc/net/ip_mr_cache.
+
+        Attributes:
+            group (IPv4Address | IPv6Address | str): Multicast group address.
+            origin (IPv4Address | IPv6Address | str): Originating IP address.
+            iif (int): Incoming interface index.
+            packets (int): Packet count.
+            bytes (int): Byte count.
+            wrong_if (int): Wrong incoming interface count.
+            oifs (dict[int, int]): Outgoing interfaces and their TTLs (outgoing_if_indx : ttl).
+    """
     group: IPv4Address | IPv6Address | str
     origin: IPv4Address | IPv6Address | str
     iif: int
@@ -307,8 +406,10 @@ class MFCEntry(Base):
 def _get_type(type_obj: str | type) -> type:
     """Get the type from the type hint.
 
-    :param type_obj: str | type: Specify that the type_obj parameter can be either a string or a type
-    :return: The type of the argument
+        Args:
+            type_obj: str | type: Specify that the type_obj parameter can be either a string or a type
+        Returns:
+            The type of the argument.
     """
     if isinstance(type_obj, type):
         return type_obj

@@ -28,6 +28,16 @@ PyObject *inet_ntop_with_exception(int af, const void *src);
 
 
 /*
+ *  SAFE_DECREF
+ *
+ *  Given a PyObject pointer, checks that it is not Py_None.
+ *  If it is not Py_None, calls Py_DECREF() on it.
+ *
+ */
+#define SAFE_DECREF(obj) do { if ((obj) != Py_None) { Py_DECREF(obj); } } while(0)
+
+
+/*
  *  ADD_ITEM_AND_CHECK
  *
  *  Given a Python dict object, a key, and a value:
@@ -44,18 +54,18 @@ PyObject *inet_ntop_with_exception(int af, const void *src);
         if (!PyErr_Occurred()) { \
             PyErr_NoMemory(); \
         }  \
-        Py_DECREF(dict); \
+        SAFE_DECREF(dict); \
         return NULL; \
     } \
     if (PyDict_SetItemString(dict, (key), _tmp_value) < 0) { \
         if (!PyErr_Occurred()) { \
             PyErr_NoMemory(); \
         }  \
-        Py_DECREF(dict); \
-        Py_DECREF(_tmp_value); \
+        SAFE_DECREF(dict); \
+        SAFE_DECREF(_tmp_value); \
         return NULL; \
     } \
-    Py_DECREF(_tmp_value); \
+    SAFE_DECREF(_tmp_value); \
 } while (0)
 
 

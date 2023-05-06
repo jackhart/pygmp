@@ -23,21 +23,25 @@
 import sys
 from setuptools import setup, Extension
 from pathlib import Path
+import sysconfig
+
 
 def main(args):
 
-    module1 = Extension('pygmp._kernel',
-                        sources=["./pygmp/_kernel.c"],
-                        include_dirs=[Path.cwd().joinpath("pygmp")],
-                        libraries=["python3.10"])
+    python_lib = sysconfig.get_config_var('LDLIBRARY').replace('lib', '').replace('.a', '').replace('.so', '')
+    include_dir = sysconfig.get_path('include')
+    pygmp_dir = Path.cwd().joinpath("pygmp")
 
+    module1 = Extension('pygmp._kernel',
+                        sources=["pygmp/_kernel.c", "pygmp/util.c"],
+                        include_dirs=[pygmp_dir, include_dir],
+                        libraries=[python_lib])
 
     if "--debug" in args:
         print("Debug mode")
         sys.argv.remove("--debug")
         module1.extra_compile_args = ["-g", "-O0"]
         module1.extra_link_args = ["-g"]
-
 
     setup(ext_modules=[module1])
 

@@ -68,7 +68,7 @@ PyObject *inet_ntop_with_exception(int af, const void *src) {
  * ----------------------------------
  *
  * Extracts readable IP address from ifaddrs struct returneed by getifaddrs.
- * Sets Python exception on failure.
+ * Sets Python exception on failure.  Returns None if the address is not IPv4 or IPv6.
  *
  */
 PyObject *sin_addr_with_exception(const struct ifaddrs *ifa) {
@@ -78,8 +78,7 @@ PyObject *sin_addr_with_exception(const struct ifaddrs *ifa) {
     if (family == AF_INET6)
         return inet_ntop_with_exception(family, &(((struct sockaddr_in6 *) ifa->ifa_addr)->sin6_addr));
 
-    PyErr_SetString(PyExc_ValueError, "Invalid address format");
-    return NULL;
+    return Py_None;
 }
 
 

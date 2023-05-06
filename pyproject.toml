@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     {name = "Jack Hart", email = "jackhart0508@gmail.com"}
 ]
-license = {file = "./LICENSE"}
+# license = {file = "./LICENSE"}
 
 [project.urls]
 Source = "https://github.com/jackhart/pygmp"

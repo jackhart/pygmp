@@ -549,8 +549,8 @@ static PyObject *get_network_interface_info(const struct ifaddrs *ifa) {
     iface_info = PyDict_New();
     CHECK_NULL_AND_RAISE_NOMEMORY(iface_info);
 
-    ADD_ITEM_AND_CHECK(iface_info, "name", PyLong_FromUnsignedLong(if_nametoindex(ifa->ifa_name)));
-    ADD_ITEM_AND_CHECK(iface_info, "index", PyUnicode_FromString(ifa->ifa_name));
+    ADD_ITEM_AND_CHECK(iface_info, "index", PyLong_FromUnsignedLong(if_nametoindex(ifa->ifa_name)));
+    ADD_ITEM_AND_CHECK(iface_info, "name", PyUnicode_FromString(ifa->ifa_name));
     ADD_ITEM_AND_CHECK(iface_info, "flags", PyLong_FromUnsignedLong(ifa->ifa_flags));
     ADD_ITEM_AND_CHECK(iface_info, "address", sin_addr_with_exception(ifa));
 

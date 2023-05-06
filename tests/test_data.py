@@ -1,4 +1,3 @@
-import enum
 from enum import Enum
 from ipaddress import IPv4Address, ip_address
 
@@ -44,46 +43,43 @@ def test_vifreq():
 
 
 def test_vifctl(inaddr_str, multicast_addr):
-    vif_ctl = data.VifCtl(1, 2, 3, inaddr_str, multicast_addr)
+    vif_ctl = data.VifCtl(1, inaddr_str, multicast_addr, 2, 0)
     assert isinstance(vif_ctl.lcl_addr, (IPv4Address,))
     assert isinstance(vif_ctl.rmt_addr, (IPv4Address,))
     assert vif_ctl.vifi == 1
     assert vif_ctl.threshold == 2
-    assert vif_ctl.rate_limit == 3
+    assert vif_ctl.rate_limit == 0
     assert str(vif_ctl.lcl_addr) == inaddr_str
     assert str(vif_ctl.rmt_addr) == multicast_addr
     assert vif_ctl.rmt_addr.is_multicast
 
 
 def test_vifctl_from_ip_obj(inaddr_str, multicast_addr):
-    vif_ctl = data.VifCtl(1, 2, 3, IPv4Address(inaddr_str), IPv4Address(multicast_addr))
+    vif_ctl = data.VifCtl(1, IPv4Address(inaddr_str), IPv4Address(multicast_addr), 2, 0)
     assert isinstance(vif_ctl.lcl_addr, (IPv4Address,))
     assert isinstance(vif_ctl.rmt_addr, (IPv4Address,))
     assert vif_ctl.vifi == 1
     assert vif_ctl.threshold == 2
-    assert vif_ctl.rate_limit == 3
+    assert vif_ctl.rate_limit == 0
     assert str(vif_ctl.lcl_addr) == inaddr_str
     assert str(vif_ctl.rmt_addr) == multicast_addr
     assert vif_ctl.rmt_addr.is_multicast
 
 
-def test_vifctl_with_defaults():
-    vif_ctl = data.VifCtl(4)
+def test_vifctl_with_defaults(inaddr_str):
+    vif_ctl = data.VifCtl(4, inaddr_str)
+    assert isinstance(vif_ctl.lcl_addr, (IPv4Address,))
+    assert str(vif_ctl.lcl_addr) == inaddr_str
     assert vif_ctl.vifi == 4
     assert vif_ctl.threshold == data.VifCtl.threshold
     assert vif_ctl.rate_limit == data.VifCtl.rate_limit
 
 
 def test_vifctl_index(multicast_addr):
-    vif_ctl = data.VifCtl(4, 2, 3, 1, multicast_addr)
+    vif_ctl = data.VifCtl(1, 2, multicast_addr, 2, 0)
     assert isinstance(vif_ctl.lcl_addr, (int,))
-    assert isinstance(vif_ctl.rmt_addr, (IPv4Address,))
-    assert vif_ctl.vifi == 4
-    assert vif_ctl.threshold == 2
-    assert vif_ctl.rate_limit == 3
-    assert vif_ctl.lcl_addr == 1
-    assert str(vif_ctl.rmt_addr) == multicast_addr
-    assert vif_ctl.rmt_addr.is_multicast
+    assert vif_ctl.vifi == 1
+    assert vif_ctl.lcl_addr == 2
 
 
 def test_mfctl(inaddr_str, multicast_addr):

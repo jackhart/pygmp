@@ -10,21 +10,24 @@ tasks:
     cmds:
       - task --list
 
-  install:
-    desc: Run setup.py to build the package.
-    deps: [ make-venv ]
+  run:
+    desc: Run the interactive shell.
+    deps: [ install ]
+    interactive: true
     cmds:
-      - sudo {{.USER_WORKING_DIR}}/venv/bin/pip3 install --force-reinstall .
+      - sudo {{.USER_WORKING_DIR}}/venv/bin/python3 pygmp interactive {{.CLI_ARGS}}
 
-  install-dev:
-    desc: Build the extension module in-place.
+  install:
+    desc: Build the extension in-place and install.  Adds metadata to venv lib linking source to pygmp directory.
     deps: [ make-venv ]
     cmds:
       - ./venv/bin/pip3 install -e .
+    status:
+      - '[ -n "$(find ./venv/lib/*/site-packages -type d -name "pygmp-*.dist-info" -print -quit)" ]'
 
   test:
     desc: Run pytests.
-    deps: [ install-dev, setup-network ]
+    deps: [ install, setup-network ]
     cmds:
       - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 -m pytest {{.CLI_ARGS}}
 
@@ -34,6 +37,7 @@ tasks:
       - sudo ./network-setup.sh --overwrite
 
   build-docs:
+    # FIXME: requires you activate the venv first
     desc: Build the documentation.
     cmds:
       - sphinx-build -b html docs/ docs/_build/html
@@ -42,7 +46,8 @@ tasks:
     cmds:
       - python3 -m pip install virtualenv
       - python3 -m venv venv
-      - ./venv/bin/pip3 install --upgrade setuptool wheel
+      - ./venv/bin/pip3 install --upgrade pip setuptools wheel
+      - ./venv/bin/pip3 install -r dev-requirements.txt
     status:
       - '[ -d ./venv ]'
     preconditions:

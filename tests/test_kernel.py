@@ -102,21 +102,21 @@ def test_disable_pim(cleaned_sock):
     kernel.disable_pim(cleaned_sock)
 
 
-def test_add_vif(cleaned_sock, vif_a1, multicast_addr):
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+def test_add_vif(cleaned_sock, vif_a1):
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
     with pytest.raises(OSError):
         kernel.add_vif(cleaned_sock, vif_ctl)
 
 
-def test_add_vif_by_index(cleaned_sock, vif_a1, multicast_addr):
-    vif_ctl = data.VifCtl(1, 1, 0, int(vif_a1["ifindx"]), multicast_addr)
+def test_add_vif_by_index(cleaned_sock, vif_a1):
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=int(vif_a1["ifindx"]))
     kernel.add_vif(cleaned_sock, vif_ctl)
 
 
 def test_add_remove_vif(cleaned_sock, vif_a1, multicast_addr):
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
     kernel.del_vif(cleaned_sock, vif_ctl)
 
@@ -124,8 +124,8 @@ def test_add_remove_vif(cleaned_sock, vif_a1, multicast_addr):
         kernel.del_vif(cleaned_sock, vif_ctl)
 
 
-def test_get_vif_counts(cleaned_sock, vif_a1, multicast_addr):
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+def test_get_vif_counts(cleaned_sock, vif_a1):
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
     vif_req = data.VifReq(1)
@@ -137,10 +137,10 @@ def test_get_vif_counts(cleaned_sock, vif_a1, multicast_addr):
 
 
 def test_get_mfc_counts(cleaned_sock, vif_a1, vif_a2, multicast_addr):
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], "0.0.0.0")
+    vif_ctl = data.VifCtl(vifi=0, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
-    vif_ctl = data.VifCtl(2, 1, 0, vif_a2["address"], "0.0.0.0")
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a2["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
     mfc_ctl = data.MfcCtl(vif_a1["address"], multicast_addr, 1, [0, 1, 1])
@@ -159,7 +159,7 @@ def test_get_vif_counts_error(cleaned_sock):
 
 def test_add_mfc(cleaned_sock, vif_a1, multicast_addr):
     # add VIF
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
     # add route
@@ -169,7 +169,7 @@ def test_add_mfc(cleaned_sock, vif_a1, multicast_addr):
 
 def test_del_mfc(cleaned_sock, vif_a1, multicast_addr):
     # add VIF
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
     # add route
@@ -182,7 +182,7 @@ def test_del_mfc(cleaned_sock, vif_a1, multicast_addr):
 
 def test_flush(cleaned_sock, vif_a1, multicast_addr):
     # add VIF
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
     # add route
@@ -193,7 +193,7 @@ def test_flush(cleaned_sock, vif_a1, multicast_addr):
     kernel.flush(cleaned_sock)
 
     # add VIF - won't throw error
-    vif_ctl = data.VifCtl(1, 1, 0, vif_a1["address"], multicast_addr)
+    vif_ctl = data.VifCtl(vifi=1, lcl_addr=vif_a1["address"])
     kernel.add_vif(cleaned_sock, vif_ctl)
 
 

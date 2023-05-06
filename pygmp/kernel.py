@@ -43,7 +43,7 @@ from pygmp import _kernel
 
 
 # This naming is used to distinguish socket types between methods.
-InetRawSocketType = TypeVar("InetRawSocketType", bound=socket.socket)  # FIXME - not sure how to enforce raw socket
+InetRawSocketType = TypeVar("InetRawSocketType", bound=socket.socket)  # FIXME - no good way to type a raw socket
 InetAnySocket = TypeVar("InetAnySocket", bound=socket.socket)
 
 
@@ -218,7 +218,7 @@ def parse_igmp(buffer: bytes) -> IGMP | IGMPv3MembershipReport | IGMPv3Query:
     return IGMP(**result_dict)
 
 
-def parse_igmp_control(buffer: bytes):
+def parse_igmp_control(buffer: bytes) -> IGMPControl:
     return IGMPControl(**_kernel.parse_igmp_control(buffer))
 
 
@@ -227,8 +227,8 @@ def network_interfaces() -> dict[str, Interface]:
     interfaces = dict()
     for inf in _kernel.network_interfaces():
         if inf["name"] not in interfaces:
-            interfaces[inf["name"]] = Interface(inf["name"], inf["index"], inf["flags"], [inf["address"]])
-        else:  # FIXME - any edge case where flags are different but name is the same?
+            interfaces[inf["name"]] = Interface(inf["name"], inf["index"], inf["flags"])
+        if inf["address"]:  # TODO - any case where flags are different but name is the same?
             interfaces[inf["name"]].addresses.append(inf["address"])
 
     return interfaces
@@ -243,7 +243,7 @@ def ip_mr_vif() -> list[VIFTableEntry]:
 
         Raises FileNotFoundError if the file does not exist.
 
-        FIXME - local_address will be index if MRT_ADD_VIF is called with one.
+        FIXME - local_address will be index if MRT_ADD_VIF is called with one.  Currently, it is converted to an IP address.
 
     """
     vifs = []
@@ -289,6 +289,8 @@ def host_hex_to_ip(hex_val: str) -> IPv4Address | IPv6Address:
 
         IP addresses are typically represented in network byte order (big-endian),
         whereas the host byte order can be little-endian depending on the architecture.
+
+        TODO - system dependent... Not sure if we always need to reverse the bytes?
     """
     host_order = bytearray.fromhex(hex_val)
     host_order.reverse()
