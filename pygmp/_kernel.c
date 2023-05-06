@@ -1,10 +1,30 @@
+// MIT License
 //
-// Created by jack on 4/14/23.
+// Copyright (c) 2023 Jack Hart
 //
-// TODO - cleanup method signatures
-// TODO - improve error handling.  I'm skipping over a lot of potential errors.
-#define PY_SSIZE_T_CLEAN
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
+// TODO - IPV6 support
+// TODO - should I be using <netinet/ip_mroute.h>, instead?  It's the "modern api" but
+//  it doesn't seem to have the same functionality as <linux/mroute.h> (?)
+
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include <linux/igmp.h>
@@ -16,12 +36,34 @@
 #include <net/if.h>
 
 #include "_kernel.h"
-
-// TODO - whats the difference between mroute and this? #include <netinet/ip_mroute.h>
-
+#include "util.h"
 
 
-PyObject *kernel_add_mfc(PyObject *self, PyObject *args) {
+
+static PyObject *parse_igmp(unsigned char *buffer, size_t len);
+static PyObject *parse_igmp_control(unsigned char *buffer, size_t len);
+static PyObject *parse_ip_header(unsigned char *buffer, size_t len);
+static PyObject *get_network_interfaces(void);
+static PyObject *get_network_interface_info(const struct ifaddrs *ifa);
+static PyObject* del_vif(int sockfd, int vifi);
+static PyObject* add_vif(int sockfd, int vifi, int thresh, int rate_limit, char *lcl_addr_str, char *rmt_addr_str);
+static PyObject *add_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp_addr, unsigned int parent_vif, PyObject *ttls_list);
+static PyObject *del_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp_addr, unsigned int parent_vif);
+static PyObject* parse_membership_report(unsigned char *buffer, size_t len);
+static PyObject* parse_query(unsigned char *buffer, size_t len);
+static PyObject* parse_query_src_list(__be32* src_list, int nsrcs, size_t len);
+static PyObject *parse_igmpv3_grec(unsigned char *buffer, size_t len);
+static size_t next_igmpv3_grec(unsigned char *buffer);
+static PyObject *parse_igmpv3_grec_list(unsigned char *buffer, size_t len);
+
+/*
+ * Function:  kernel_add_mfc
+ * --------------------
+ * Adds a multicast forwarding cache entry to the kernel.
+ */
+PyObject *kernel_add_mfc(PyObject *self, PyObject *args, PyObject* kwargs) {
+    static char* keywords[] = {"sock", "src_str", "grp_str", "parent_vif", "ttls", NULL};
+
     // TODO - add expire flag
     const char *src_str, *grp_str;
     unsigned int parent_vif;
@@ -30,16 +72,12 @@ PyObject *kernel_add_mfc(PyObject *self, PyObject *args) {
     struct in_addr src_addr, grp_addr;
     int sockfd;
 
-    // Parse input arguments
-    if (!PyArg_ParseTuple(args, "OssIO", &sock_obj, &src_str, &grp_str,
-                          &parent_vif, &ttls_obj))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OssIO", keywords, &sock_obj, &src_str, &grp_str, &parent_vif, &ttls_obj))
         return NULL;
 
     // Convert source and group addresses from string to binary format
-    if (!inet_aton(src_str, &src_addr) || !inet_aton(grp_str, &grp_addr)) {
-        PyErr_SetString(PyExc_ValueError, "Invalid address format");
+    if (!inet_pton_with_exception(AF_INET, src_str, &src_addr) || !inet_pton_with_exception(AF_INET, grp_str, &grp_addr))
         return NULL;
-    }
 
     sockfd = PyObject_AsFileDescriptor(sock_obj);
     if (sockfd < 0) {
@@ -58,22 +96,26 @@ PyObject *kernel_add_mfc(PyObject *self, PyObject *args) {
 }
 
 
-PyObject *kernel_del_mfc(PyObject *self, PyObject *args) {
+/*
+ * Function:  kernel_del_mfc
+ * --------------------
+ * Deletes a multicast forwarding cache entry from the kernel.
+ */
+PyObject *kernel_del_mfc(PyObject *self, PyObject *args, PyObject* kwargs) {
+    static char* keywords[] = {"sock", "src_str", "grp_str", "parent_vif", NULL};
+
     const char *src_str, *grp_str;
     unsigned int parent_vif;
     PyObject *sock_obj;
     struct in_addr src_addr, grp_addr;
     int sockfd;
 
-    // Parse input arguments
-    if (!PyArg_ParseTuple(args, "OssI", &sock_obj, &src_str, &grp_str, &parent_vif))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OssI", keywords, &sock_obj, &src_str, &grp_str, &parent_vif))
         return NULL;
 
     // Convert source and group addresses from string to binary format
-    if (!inet_aton(src_str, &src_addr) || !inet_aton(grp_str, &grp_addr)) {
-        PyErr_SetString(PyExc_ValueError, "Invalid address format");
+    if (!inet_pton_with_exception(AF_INET, src_str, &src_addr) || !inet_pton_with_exception(AF_INET, grp_str, &grp_addr))
         return NULL;
-    }
 
     sockfd = PyObject_AsFileDescriptor(sock_obj);
     if (sockfd < 0) {
@@ -86,7 +128,11 @@ PyObject *kernel_del_mfc(PyObject *self, PyObject *args) {
 
 }
 
-
+/*
+ * Function:  kernel_add_vif
+ * --------------------
+ * Adds a multicast virtual interface to the kernel.
+ */
 PyObject *kernel_add_vif(PyObject* self, PyObject* args, PyObject* kwargs) {
     static char* keywords[] = {"sock", "vifi", "threshold", "rate_limit", "lcl_addr", "rmt_addr", NULL};
 
@@ -95,9 +141,8 @@ PyObject *kernel_add_vif(PyObject* self, PyObject* args, PyObject* kwargs) {
     char* rmt_addr_str = NULL;
     PyObject *sock_obj;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oiii|ss", keywords, &sock_obj, &vifi, &thresh, &rate_limit, &lcl_addr_str, &rmt_addr_str)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oiii|ss", keywords, &sock_obj, &vifi, &thresh, &rate_limit, &lcl_addr_str, &rmt_addr_str))
         return NULL;
-    }
 
     sockfd = PyObject_AsFileDescriptor(sock_obj);
     if (sockfd < 0) {
@@ -108,14 +153,19 @@ PyObject *kernel_add_vif(PyObject* self, PyObject* args, PyObject* kwargs) {
     return add_vif(sockfd, vifi, thresh, rate_limit, lcl_addr_str, rmt_addr_str);
 }
 
+/*
+ * Function:  kernel_del_vif
+ * --------------------
+ * Deletes a multicast virtual interface from the kernel.
+ */
+PyObject *kernel_del_vif(PyObject *self, PyObject *args, PyObject* kwargs) {
+    static char* keywords[] = {"sock", "vifi", NULL};
 
-PyObject *kernel_del_vif(PyObject *self, PyObject *args) {
     int vifi, sockfd;
     PyObject *sock_obj;
 
-    if (!PyArg_ParseTuple(args, "Oi", &sock_obj, &vifi)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi", keywords, &sock_obj, &vifi))
         return NULL;
-    }
 
     sockfd = PyObject_AsFileDescriptor(sock_obj);
     if (sockfd < 0) {
@@ -127,54 +177,87 @@ PyObject *kernel_del_vif(PyObject *self, PyObject *args) {
 }
 
 
+/*
+ * Function:  kernel_parse_igmp_control
+ * --------------------
+ * Parses a control message from the kernel on the multicast routing socket.
+ */
+PyObject *kernel_parse_igmp_control(PyObject *self, PyObject *args, PyObject* kwargs) {
+    static char* keywords[] = {"buffer", NULL};
 
-PyObject *kernel_parse_igmp_control(PyObject *self, PyObject *args) {
     char *input;
     Py_ssize_t input_size;
 
-    // Parse input arguments
-    if (!PyArg_ParseTuple(args, "y#", &input, &input_size)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y#", keywords, &input, &input_size))
+        return NULL;
+
+    if (input_size < 0) {
+        PyErr_SetString(PyExc_ValueError, "Invalid buffer length");
         return NULL;
     }
 
-    // Call parse_igmp with the input buffer
-    return parse_igmp_control((unsigned char *)input, input_size);
+
+    return parse_igmp_control((unsigned char *)input, (size_t)input_size);
 }
 
+/*
+ * Function:  kernel_parse_igmp
+ * --------------------
+ * Parses an IGMP packet.
+ */
+PyObject *kernel_parse_igmp(PyObject *self, PyObject *args, PyObject* kwargs) {
+    static char* keywords[] = {"buffer", NULL};
 
-PyObject *kernel_parse_igmp(PyObject *self, PyObject *args) {
     const char *data;
     Py_ssize_t data_len;
 
-    if (!PyArg_ParseTuple(args, "y#", &data, &data_len)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y#", keywords, &data, &data_len))
+        return NULL;
+
+    if (data_len < 0) {
+        PyErr_SetString(PyExc_ValueError, "Invalid buffer length");
         return NULL;
     }
 
-    return parse_igmp((unsigned char *)data, data_len);
+    return parse_igmp((unsigned char *)data, (size_t)data_len);
 }
 
+/*
+ * Function:  kernel_parse_ip_header
+ * --------------------
+ * Parses header of an IP packet.
+ */
+PyObject *kernel_parse_ip_header(PyObject *self, PyObject *args, PyObject* kwargs) {
+    static char* keywords[] = {"buffer", NULL};
 
-PyObject *kernel_parse_ip_header(PyObject *self, PyObject *args) {
     char *packet;
     Py_ssize_t packet_len;
 
-    if (!PyArg_ParseTuple(args, "y#", &packet, &packet_len)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y#", keywords, &packet, &packet_len))
+        return NULL;
+
+    if (packet_len < 0) {
+        PyErr_SetString(PyExc_ValueError, "Invalid buffer length");
         return NULL;
     }
 
-    return parse_ip_header((unsigned char *)packet, packet_len);
+
+    return parse_ip_header((unsigned char *)packet, (size_t)packet_len);
 
 }
 
-
+/*
+ * Function:  kernel_parse_ip_header
+ * --------------------
+ * Get the network interfaces on the system.  These are not the multicast virtual interfaces.
+ */
 PyObject *kernel_network_interfaces(PyObject *self, PyObject *args)
 {
     return get_network_interfaces();
 }
 
 
-static PyObject *parse_igmp(unsigned char *buffer, Py_ssize_t len) {
-    // TODO - support ipv6
+static PyObject *parse_igmp(unsigned char *buffer, size_t len) {
     if (len < sizeof(struct igmphdr)) {
         PyErr_SetString(PyExc_ValueError, "Buffer too short for igmphdr");
         return NULL;
@@ -182,28 +265,179 @@ static PyObject *parse_igmp(unsigned char *buffer, Py_ssize_t len) {
 
     struct igmphdr *igmp = (struct igmphdr *) buffer;
 
-    // Create a Python dictionary to store the fields
+    // IGMPv3 membership report
+    if (igmp->type == IGMPV3_HOST_MEMBERSHIP_REPORT)
+        return parse_membership_report(buffer, len);
+
+    // IGMPv3 membership query
+    if ((len > sizeof(struct igmphdr)) && (igmp->type == IGMP_HOST_MEMBERSHIP_QUERY))
+        return parse_query(buffer, len);
+
+    // IGMP v2 and v1 messages  -- TODO - different fields by msg type?
     PyObject *result = PyDict_New();
-    if (result == NULL) {
-        PyErr_NoMemory();
-        return NULL;
+    CHECK_NULL_AND_RAISE_NOMEMORY(result);
+
+    ADD_ITEM_AND_CHECK(result, "type", PyLong_FromLong(igmp->type));
+    ADD_ITEM_AND_CHECK(result, "max_response_time", PyLong_FromLong(igmp->code));
+    ADD_ITEM_AND_CHECK(result, "checksum", PyLong_FromLong(ntohs(igmp->csum)));
+    ADD_ITEM_AND_CHECK(result, "group", inet_ntop_with_exception(AF_INET, &(igmp->group)));
+    return result;
+}
+
+
+static PyObject* parse_membership_report(unsigned char *buffer, size_t len) {
+    struct igmpv3_report *report = (struct igmpv3_report *) buffer;
+
+    PyObject *result = PyDict_New();
+    CHECK_NULL_AND_RAISE_NOMEMORY(result);
+
+    ADD_ITEM_AND_CHECK(result, "type", PyLong_FromLong(report->type));
+    ADD_ITEM_AND_CHECK(result, "checksum", PyLong_FromLong(ntohs(report->csum)));
+    ADD_ITEM_AND_CHECK(result, "num_records", PyLong_FromLong(ntohs(report->ngrec)));
+
+    if ((ntohs(report->ngrec) > 0) ) {
+        if (len < sizeof(struct igmpv3_report) + (sizeof(struct igmpv3_grec) * ntohs(report->ngrec))) {
+            PyErr_SetString(PyExc_ValueError, "Buffer too short for group records");
+            Py_DecRef(result);
+            return NULL;
+        }
+        unsigned char *grec_buffer = buffer + sizeof(struct igmpv3_report);
+        ADD_ITEM_AND_CHECK(result, "grec_list", parse_igmpv3_grec_list(grec_buffer, len - sizeof(struct igmpv3_report)));
+    } else {
+        ADD_ITEM_AND_CHECK(result, "grec_list", Py_None);
     }
-
-    char group_str[ADDR_BUF_LEN];
-    inet_ntop(AF_INET, &(igmp->group), group_str, ADDR_BUF_LEN);
-
-    // Add the fields to the dictionary
-    PyDict_SetItemString(result, "type", PyLong_FromLong(igmp->type));
-    PyDict_SetItemString(result, "code", PyLong_FromLong(igmp->code));
-    PyDict_SetItemString(result, "checksum", PyLong_FromLong(ntohs(igmp->csum)));
-    PyDict_SetItemString(result, "group", PyUnicode_FromString(group_str));
 
     return result;
 }
 
 
-static PyObject *parse_igmp_control(unsigned char *buffer, Py_ssize_t len) {
-    // TODO - support ipv6
+static PyObject* parse_query(unsigned char *buffer, size_t len) {
+    if (len < sizeof(struct igmpv3_query)) {
+        PyErr_SetString(PyExc_ValueError, "Buffer too short for igmpv3_query");
+        return NULL;
+    }
+
+    struct igmpv3_query *query = (struct igmpv3_query *) buffer;
+
+    PyObject *result = PyDict_New();
+    CHECK_NULL_AND_RAISE_NOMEMORY(result);
+
+
+    // IGMPv3 Max Resp Time = (mant | 0x10) << (exp + 3)
+    unsigned int max_resp_time = query->code;
+    if (max_resp_time >= 128) {
+        unsigned char exp = max_resp_time >> 5;
+        unsigned char mant = max_resp_time & 0x1F;
+        max_resp_time = (mant | 0x10) << (exp - 3);
+    }
+
+    ADD_ITEM_AND_CHECK(result, "type", PyLong_FromLong(query->type));
+    ADD_ITEM_AND_CHECK(result, "max_response_time", PyLong_FromLong(max_resp_time));
+    ADD_ITEM_AND_CHECK(result, "checksum", PyLong_FromLong(ntohs(query->csum)));
+    ADD_ITEM_AND_CHECK(result, "group", inet_ntop_with_exception(AF_INET, &(query->group)));
+    ADD_ITEM_AND_CHECK(result, "qqic", PyLong_FromLong(query->qqic));
+    ADD_ITEM_AND_CHECK(result, "suppress", PyBool_FromLong(query->suppress));
+    ADD_ITEM_AND_CHECK(result, "querier_robustness", PyLong_FromLong(query->qrv));
+    ADD_ITEM_AND_CHECK(result, "querier_query_interval", PyLong_FromLong(query->qqic));
+    ADD_ITEM_AND_CHECK(result, "num_sources", PyLong_FromLong(ntohs(query->nsrcs)));
+    ADD_ITEM_AND_CHECK(result, "src_list", parse_query_src_list(query->srcs, ntohs(query->nsrcs), len - sizeof(struct igmpv3_query)));
+
+    return result;
+}
+
+
+// Helper function to parse source address list in igmpv3_query
+static PyObject* parse_query_src_list(__be32* src_list, int nsrcs, size_t len) {
+
+    if (len < (nsrcs * sizeof(__be32))) {
+        PyErr_SetString(PyExc_ValueError, "Buffer too short for source list");
+        return NULL;
+    }
+
+    PyObject* src_list_obj = PyList_New(nsrcs);
+    CHECK_NULL_AND_RAISE_NOMEMORY(src_list_obj);
+
+    for (int i = 0; i < nsrcs; i++) {
+
+        PyObject *src_str_obj = inet_ntop_with_exception(AF_INET, &(src_list[i]));
+        if (!src_str_obj) {
+            Py_DECREF(src_list_obj);
+            return NULL;
+        }
+
+        if (PyList_SetItem(src_list_obj, i, src_str_obj) == -1) {
+            Py_DECREF(src_str_obj);
+            Py_DECREF(src_list_obj);
+            return NULL;
+        }
+    }
+
+    return src_list_obj;
+}
+
+
+static PyObject *parse_igmpv3_grec_list(unsigned char *buffer, size_t len) {
+    PyObject *grec_list = PyList_New(0);
+    if (grec_list == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+
+    while (len > 0) {
+        if (len < sizeof(struct igmpv3_grec)) {
+            PyErr_SetString(PyExc_ValueError, "Buffer too short for igmpv3_grec");
+            Py_DECREF(grec_list);
+            return NULL;
+        }
+
+        PyObject *grec_dict = parse_igmpv3_grec(buffer, len);
+        if (grec_dict == NULL) {
+            Py_DECREF(grec_list);
+            return NULL;
+        }
+
+        // Add grec_dict to grec_list
+        if (PyList_Append(grec_list, grec_dict) == -1) {
+            Py_DECREF(grec_list);
+            Py_DECREF(grec_dict);
+            return NULL;
+        }
+
+        Py_DECREF(grec_dict);  // append does not steal the reference.
+
+        size_t grec_size = next_igmpv3_grec(buffer);
+        buffer += grec_size;
+        len -= grec_size;
+    }
+
+    return grec_list;
+}
+
+
+static PyObject *parse_igmpv3_grec(unsigned char *buffer, size_t len) {
+    struct igmpv3_grec *grec = (struct igmpv3_grec *) buffer;
+
+    PyObject *grec_dict = PyDict_New();
+    CHECK_NULL_AND_RAISE_NOMEMORY(grec_dict);
+
+    ADD_ITEM_AND_CHECK(grec_dict, "type", PyLong_FromLong(grec->grec_type));
+    ADD_ITEM_AND_CHECK(grec_dict, "auxwords", PyLong_FromLong(grec->grec_auxwords));  // should always be 0
+    ADD_ITEM_AND_CHECK(grec_dict, "nsrcs", PyLong_FromLong(ntohs(grec->grec_nsrcs)));
+    ADD_ITEM_AND_CHECK(grec_dict, "mca", inet_ntop_with_exception(AF_INET, &(grec->grec_mca)));
+    ADD_ITEM_AND_CHECK(grec_dict, "src_list", parse_query_src_list(grec->grec_src, ntohs(grec->grec_nsrcs), len - sizeof(struct igmpv3_grec)));
+
+    return grec_dict;
+}
+
+
+static size_t next_igmpv3_grec(unsigned char *buffer) {
+    struct igmpv3_grec *grec = (struct igmpv3_grec *) buffer;
+    unsigned int nsrcs = ntohs(grec->grec_nsrcs);
+    return sizeof(struct igmpv3_grec) + nsrcs * sizeof(__be32);
+}
+
+
+static PyObject *parse_igmp_control(unsigned char *buffer, size_t len) {
     if (len < sizeof(struct igmpmsg)) {
         PyErr_SetString(PyExc_ValueError, "Buffer too short for igmpmsg");
         return NULL;
@@ -213,31 +447,20 @@ static PyObject *parse_igmp_control(unsigned char *buffer, Py_ssize_t len) {
 
     // create dictionary to store IP header fields
     PyObject *result_dict = PyDict_New();
-    if (result_dict == NULL) {
-        PyErr_NoMemory();
-        return NULL;
-    }
+    CHECK_NULL_AND_RAISE_NOMEMORY(result_dict);
 
-    // convert address fields to string representations
-    char src_addr_str[ADDR_BUF_LEN];
-    char dst_addr_str[ADDR_BUF_LEN];
-    inet_ntop(AF_INET, &(igmp->im_src), src_addr_str, ADDR_BUF_LEN);
-    inet_ntop(AF_INET, &(igmp->im_dst), dst_addr_str, ADDR_BUF_LEN);
+    ADD_ITEM_AND_CHECK(result_dict, "msgtype", PyLong_FromLong(igmp->im_msgtype));
+    ADD_ITEM_AND_CHECK(result_dict, "mbz", PyLong_FromLong(igmp->im_mbz));
+    ADD_ITEM_AND_CHECK(result_dict, "vif", PyLong_FromLong(igmp->im_vif));
+    ADD_ITEM_AND_CHECK(result_dict, "vif_hi", PyLong_FromLong(igmp->im_vif_hi));
+    ADD_ITEM_AND_CHECK(result_dict, "im_src", inet_ntop_with_exception(AF_INET, &(igmp->im_src)));
+    ADD_ITEM_AND_CHECK(result_dict, "im_dst", inet_ntop_with_exception(AF_INET, &(igmp->im_dst)));
 
-    // add IP header fields to dictionary
-    PyDict_SetItemString(result_dict, "msgtype", PyLong_FromLong(igmp->im_msgtype));
-    PyDict_SetItemString(result_dict, "mbz", PyLong_FromLong(igmp->im_mbz));
-    PyDict_SetItemString(result_dict, "vif", PyLong_FromLong(igmp->im_vif));
-    PyDict_SetItemString(result_dict, "vif_hi", PyLong_FromLong(igmp->im_vif_hi));
-    PyDict_SetItemString(result_dict, "im_src", PyUnicode_FromString(src_addr_str));
-    PyDict_SetItemString(result_dict, "im_dst", PyUnicode_FromString(dst_addr_str));
-
-    // return result dictionary
     return result_dict;
 }
 
 
-static PyObject *parse_ip_header(unsigned char *buffer, Py_ssize_t len) {
+static PyObject *parse_ip_header(unsigned char *buffer, size_t len) {
     // TODO - support ipv6
     if (len < sizeof(struct iphdr)) {
         PyErr_SetString(PyExc_ValueError, "Packet too short for IP header");
@@ -248,31 +471,21 @@ static PyObject *parse_ip_header(unsigned char *buffer, Py_ssize_t len) {
 
     // create dictionary to store IP header fields
     PyObject *result_dict = PyDict_New();
-    if (result_dict == NULL) {
-        PyErr_NoMemory();
-        return NULL;
-    }
-
-    // convert address fields to string representations
-    char src_addr_str[ADDR_BUF_LEN];
-    char dst_addr_str[ADDR_BUF_LEN];
-    inet_ntop(AF_INET, &(ip_header->saddr), src_addr_str, ADDR_BUF_LEN);
-    inet_ntop(AF_INET, &(ip_header->daddr), dst_addr_str, ADDR_BUF_LEN);
+    CHECK_NULL_AND_RAISE_NOMEMORY(result_dict);
 
     // add IP header fields to dictionary
-    PyDict_SetItemString(result_dict, "version", PyLong_FromLong(ip_header->version));
-    PyDict_SetItemString(result_dict, "ihl", PyLong_FromLong(ip_header->ihl));
-    PyDict_SetItemString(result_dict, "tos", PyLong_FromLong(ip_header->tos));
-    PyDict_SetItemString(result_dict, "tot_len", PyLong_FromLong(ntohs(ip_header->tot_len)));
-    PyDict_SetItemString(result_dict, "id", PyLong_FromLong(ntohs(ip_header->id)));
-    PyDict_SetItemString(result_dict, "frag_off", PyLong_FromLong(ntohs(ip_header->frag_off)));
-    PyDict_SetItemString(result_dict, "ttl", PyLong_FromLong(ip_header->ttl));
-    PyDict_SetItemString(result_dict, "protocol", PyLong_FromLong(ip_header->protocol));
-    PyDict_SetItemString(result_dict, "check", PyLong_FromLong(ntohs(ip_header->check)));
-    PyDict_SetItemString(result_dict, "src_addr", PyUnicode_FromString(src_addr_str));
-    PyDict_SetItemString(result_dict, "dst_addr", PyUnicode_FromString(dst_addr_str));
+    ADD_ITEM_AND_CHECK(result_dict, "version", PyLong_FromLong(ip_header->version));
+    ADD_ITEM_AND_CHECK(result_dict, "ihl", PyLong_FromLong(ip_header->ihl));
+    ADD_ITEM_AND_CHECK(result_dict, "tos", PyLong_FromLong(ip_header->tos));
+    ADD_ITEM_AND_CHECK(result_dict, "tot_len", PyLong_FromLong(ntohs(ip_header->tot_len)));
+    ADD_ITEM_AND_CHECK(result_dict, "id", PyLong_FromLong(ntohs(ip_header->id)));
+    ADD_ITEM_AND_CHECK(result_dict, "frag_off", PyLong_FromLong(ntohs(ip_header->frag_off)));
+    ADD_ITEM_AND_CHECK(result_dict, "ttl", PyLong_FromLong(ip_header->ttl));
+    ADD_ITEM_AND_CHECK(result_dict, "protocol", PyLong_FromLong(ip_header->protocol));
+    ADD_ITEM_AND_CHECK(result_dict, "check", PyLong_FromLong(ntohs(ip_header->check)));
+    ADD_ITEM_AND_CHECK(result_dict, "src_addr", inet_ntop_with_exception(AF_INET, &(ip_header->saddr)));
+    ADD_ITEM_AND_CHECK(result_dict, "dst_addr", inet_ntop_with_exception(AF_INET, &(ip_header->daddr)));
 
-    // return result dictionary
     return result_dict;
 }
 
@@ -281,11 +494,9 @@ static PyObject *get_network_interfaces(void)
 {
     struct ifaddrs *ifap, *ifa;
     PyObject *iface_list, *iface_info;
-    int ret;
 
     // get linked list of interfaces
-    ret = getifaddrs(&ifap);
-    if (ret == -1) {
+    if (getifaddrs(&ifap) == -1) {
         PyErr_SetFromErrno(PyExc_OSError);
         return NULL;
     }
@@ -321,46 +532,29 @@ static PyObject *get_network_interfaces(void)
             PyErr_NoMemory();
             return NULL;
         }
-        Py_DECREF(iface_info);
+        Py_DECREF(iface_info);  // append does not steal the reference
     }
 
     freeifaddrs(ifap);
     return iface_list;
 }
 
-
+/*
+ * Put ifaddrs fields into new dict.  Returns NULL on error and sets exception.
+ */
 static PyObject *get_network_interface_info(const struct ifaddrs *ifa) {
     PyObject *iface_info;
 
     // create dictionary to store interface info
     iface_info = PyDict_New();
-    if (iface_info == NULL) {
-        PyErr_NoMemory();
-        return NULL;
-    }
+    CHECK_NULL_AND_RAISE_NOMEMORY(iface_info);
 
-    // TODO - edge case when ifa_name or flags are null?
-    PyDict_SetItemString(iface_info, "name", PyUnicode_FromString(ifa->ifa_name));
-    PyDict_SetItemString(iface_info, "index", PyLong_FromUnsignedLong(if_nametoindex(ifa->ifa_name)));
-    PyDict_SetItemString(iface_info, "flags", PyLong_FromUnsignedLong(ifa->ifa_flags));
-    PyDict_SetItemString(iface_info, "address", get_address(ifa));
+    ADD_ITEM_AND_CHECK(iface_info, "name", PyLong_FromUnsignedLong(if_nametoindex(ifa->ifa_name)));
+    ADD_ITEM_AND_CHECK(iface_info, "index", PyUnicode_FromString(ifa->ifa_name));
+    ADD_ITEM_AND_CHECK(iface_info, "flags", PyLong_FromUnsignedLong(ifa->ifa_flags));
+    ADD_ITEM_AND_CHECK(iface_info, "address", sin_addr_with_exception(ifa));
 
     return iface_info;
-}
-
-
-static PyObject* get_address(const struct ifaddrs *ifa) {
-    char addr_buf[ADDR_BUF_LEN] = {0};
-    int family = ifa->ifa_addr->sa_family;
-    if (family == AF_INET || family == AF_INET6) {
-        // get address string
-        if (family == AF_INET) {
-            inet_ntop(family, &(((struct sockaddr_in *) ifa->ifa_addr)->sin_addr), addr_buf, INET_ADDRSTRLEN);
-        } else {
-            inet_ntop(family, &(((struct sockaddr_in6 *) ifa->ifa_addr)->sin6_addr), addr_buf, INET6_ADDRSTRLEN);
-        }
-    }
-    return PyUnicode_FromString(addr_buf);
 }
 
 
@@ -374,9 +568,7 @@ static PyObject* del_vif(int sockfd, int vifi) {
         PyErr_SetFromErrno(PyExc_OSError);
         return NULL;
     }
-
     Py_RETURN_NONE;
-
 }
 
 
@@ -384,8 +576,9 @@ static PyObject* add_vif(int sockfd, int vifi, int thresh, int rate_limit, char 
     struct vifctl vif;
     struct in_addr lcl_addr, rmt_addr;
 
-    // set rmt_addr
-    inet_aton(rmt_addr_str, &rmt_addr);
+    if (inet_pton_with_exception(AF_INET, rmt_addr_str, &rmt_addr) < 0) {
+        return NULL;
+    }
 
     memset(&vif, 0, sizeof(vif));
     vif.vifc_vifi = vifi;
@@ -394,11 +587,15 @@ static PyObject* add_vif(int sockfd, int vifi, int thresh, int rate_limit, char 
     vif.vifc_rmt_addr = rmt_addr;
 
     // check if lcl_addr_str is a valid IP address
-    if (inet_pton(AF_INET, lcl_addr_str, &lcl_addr) > 0) {
+    if (inet_pton_with_exception(AF_INET, lcl_addr_str, &lcl_addr) > 0) {
         vif.vifc_lcl_addr.s_addr = lcl_addr.s_addr;
     } else {
+        if (!PyErr_ExceptionMatches(PyExc_ValueError)) {
+            return NULL;
+        }
         // assume lcl_addr_str is an interface index
-        vif.vifc_lcl_ifindex = atoi(lcl_addr_str);
+        PyErr_Clear();
+        vif.vifc_lcl_ifindex = atoi(lcl_addr_str);  // FIXME - error handling
         vif.vifc_flags |= VIFF_USE_IFINDEX;
     }
 
@@ -415,6 +612,7 @@ static PyObject *add_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp
 {
     struct mfcctl mfc;
     int i;
+    PyObject *item;
 
     // Fill in the multicast forwarding cache control structure
     memset(&mfc, 0, sizeof(mfc));
@@ -422,8 +620,23 @@ static PyObject *add_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp
     mfc.mfcc_mcastgrp = grp_addr;
     mfc.mfcc_parent = parent_vif;
     if (ttls_list != Py_None) {
-        for (i = 0; i < PyList_Size(ttls_list) && i < MAXVIFS; i++) {
-            mfc.mfcc_ttls[i] = PyLong_AsUnsignedLong(PyList_GetItem(ttls_list, i));
+        Py_ssize_t list_size = PyList_Size(ttls_list);
+        if (list_size < 0) {
+            PyErr_SetString(PyExc_TypeError, "Expected a list object for ttls_list");
+            return NULL;
+        }
+
+        for (i = 0; i < list_size && i < MAXVIFS; i++) {
+            item = PyList_GetItem(ttls_list, i);
+            if (!item) {
+                PyErr_Format(PyExc_IndexError, "Failed to get item at index %d in ttls_list", i);
+                return NULL;
+            }
+            if (!PyLong_Check(item)) {
+                PyErr_Format(PyExc_TypeError, "Expected an integer value at index %d in ttls_list", i);
+                return NULL;
+            }
+            mfc.mfcc_ttls[i] = PyLong_AsUnsignedLong(item);
         }
     }
 
@@ -435,6 +648,7 @@ static PyObject *add_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp
 
     Py_RETURN_NONE;
 }
+
 
 static PyObject *del_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp_addr, unsigned int parent_vif) {
     struct mfcctl mfc;
@@ -458,13 +672,13 @@ static PyObject *del_mfc(int sockfd, struct in_addr src_addr, struct in_addr grp
 // TODO - add metadata for args
 static PyMethodDef kernel_methods[] = {
         {"network_interfaces", kernel_network_interfaces, METH_NOARGS, "Get basic info on network interface devices."},
-        {"add_mfc", kernel_add_mfc, METH_VARARGS, "Add a multicast forwarding cache entry."},
-        {"del_mfc", kernel_del_mfc, METH_VARARGS, "Delete a multicast forwarding cache entry."},
+        {"add_mfc", (PyCFunction)kernel_add_mfc, METH_VARARGS | METH_KEYWORDS, "Add a multicast forwarding cache entry."},
+        {"del_mfc", (PyCFunction)kernel_del_mfc, METH_VARARGS | METH_KEYWORDS, "Delete a multicast forwarding cache entry."},
         {"add_vif", (PyCFunction)kernel_add_vif, METH_VARARGS | METH_KEYWORDS, "Add a virtual interface to the multicast routing table."},
-        {"del_vif", kernel_del_vif, METH_VARARGS, "Delete a virtual interface from the multicast routing table."},
-        {"parse_igmp_control", kernel_parse_igmp_control, METH_VARARGS, "Parse an IGMP control message."},
-        {"parse_ip_header", kernel_parse_ip_header, METH_VARARGS, "Parse an IP header."},
-        {"parse_igmp", kernel_parse_igmp, METH_VARARGS, "Parse an IGMP message.  Only the payload of the IP packet."},
+        {"del_vif", (PyCFunction)kernel_del_vif, METH_VARARGS | METH_KEYWORDS, "Delete a virtual interface from the multicast routing table."},
+        {"parse_igmp_control", (PyCFunction)kernel_parse_igmp_control, METH_VARARGS | METH_KEYWORDS, "Parse an IGMP control message."},
+        {"parse_ip_header", (PyCFunction)kernel_parse_ip_header, METH_VARARGS | METH_KEYWORDS, "Parse an IP header."},
+        {"parse_igmp", (PyCFunction)kernel_parse_igmp, METH_VARARGS | METH_KEYWORDS, "Parse an IGMP message.  Only the payload of the IP packet."},
         {NULL, NULL, 0, NULL}
 };
 
@@ -573,3 +787,6 @@ PyMODINIT_FUNC PyInit__kernel(void) {
 #endif
     return m;
 }
+
+#undef CHECK_NULL_AND_RAISE_NOMEMORY
+#undef ADD_ITEM_AND_CHECK

@@ -1,13 +1,34 @@
 """
-
 TODO:
     Investigate syscalls that are not yet implemented.
         - MRT_TABLE -- Linux only, support for multiple MRT tables.  (e.g,, for multiple routing daemons)
         - MRT_ADD_MFC_PROXY
         - MRT_DEL_MFC_PROXY
-        - SIOCGETRPF  -- Get the RPF neighbor for a given source and group?  
-
+        - SIOCGETRPF  -- Get the RPF neighbor for a given source and group?
 """
+#  MIT License
+#
+#  Copyright (c) 2023 Jack Hart
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+
+from __future__ import annotations
 import struct
 from contextlib import contextmanager
 from typing import TypeVar
@@ -16,7 +37,8 @@ import fcntl
 from ipaddress import ip_address, IPv4Address, IPv6Address
 
 from pygmp.data import VifReq, IpMreq, VifCtl, MfcCtl, SGReq, IPHeader, \
-    IGMPControl, IGMP, Interface, VIFTableEntry, MFCEntry
+    IGMPControl, Interface, VIFTableEntry, MFCEntry, \
+    IGMP, IGMPType, IGMPv3Query, IGMPv3MembershipReport
 from pygmp import _kernel
 
 
@@ -94,7 +116,11 @@ def pim_is_enabled(sock: InetRawSocketType) -> bool:
 
 
 def add_vif(sock: InetRawSocketType, vifctl: VifCtl) -> None:
-    """Add a multicast VIF to the kernel multicast routing table."""
+    """Add a multicast VIF to the kernel multicast routing table.
+
+        :parameter sock: The IGMP socket.
+        :parameter vifctl: Metadata to create the new VIF.
+    """
     _kernel.add_vif(sock, vifctl.vifi, vifctl.threshold, vifctl.rate_limit, str(vifctl.lcl_addr), str(vifctl.rmt_addr))
 
 
@@ -141,13 +167,26 @@ def flush(sock: InetRawSocketType, vifs=True, mfc=True, static=True) -> None:
 
 
 def add_membership(sock: InetAnySocket, ip_mreq: IpMreq) -> None:
-    """Send an IGMP packet request."""
+    """add membership <ip_mreq>
+
+        Runs setsockopt with IP_ADD_MEMBERSHIP option on the socket used for multicast routing.  This tells the kernel
+        to join a multicast group on the specified interface.  The kernel sends an IGMP message to join the group
+        initially, and then it periodically sends IGMP membership reports to maintain the membership.  When the socket
+        is closed, the kernel will send an IGMP message to leave the group.
+
+        This should not be necessary to do any multicast routing.  However, if your switch is configured with
+        IGMP-snooping, sometimes IGMP messages are not properly forwarded to the router.
+    """
     mreq_buff = struct.pack(ip_mreq.format, ip_mreq.multiaddr.packed, ip_mreq.interface.packed)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq_buff)
 
 
 def drop_membership(sock: InetAnySocket, ip_mreq: IpMreq) -> None:
-    """Send an IGMP packet drop request."""
+    """drop membership.
+
+        Runs setsockopt with IP_DROP_MEMBERSHIP option on the socket used for multicast routing.  This tells the kernel
+        to send an IGMP message to leave the specified group.
+    """
     mreq_buff = struct.pack(ip_mreq.format, ip_mreq.multiaddr.packed, ip_mreq.interface.packed)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq_buff)
 
@@ -165,12 +204,18 @@ def interface(sock: InetAnySocket) -> str:
     return socket.inet_ntoa(in_buff)
 
 
-def parse_ip_header(buffer: bytes):
+def parse_ip_header(buffer: bytes) -> IPHeader:
     return IPHeader(**_kernel.parse_ip_header(buffer))
 
 
-def parse_igmp(buffer: bytes):
-    return IGMP(**_kernel.parse_igmp(buffer))
+def parse_igmp(buffer: bytes) -> IGMP | IGMPv3MembershipReport | IGMPv3Query:
+    result_dict = _kernel.parse_igmp(buffer)
+    msg_type = IGMPType(result_dict["type"])
+    if msg_type == IGMPType.V3_MEMBERSHIP_REPORT:
+        return IGMPv3MembershipReport(**result_dict)
+    if msg_type == IGMPType.MEMBERSHIP_QUERY and len(result_dict) > 4:
+        return IGMPv3Query(**result_dict)
+    return IGMP(**result_dict)
 
 
 def parse_igmp_control(buffer: bytes):
@@ -249,6 +294,7 @@ def host_hex_to_ip(hex_val: str) -> IPv4Address | IPv6Address:
     host_order.reverse()
     big_endian = bytes(host_order)
     return ip_address(big_endian)
+
 
 def _parse_index_ttl(pairs_list: list[str]) -> dict[int, int]:
     """Parse a list of index:ttl pairs into a dictionary."""

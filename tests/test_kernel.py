@@ -1,7 +1,7 @@
 import pytest
 import socket
 
-from pygmp import data, kernel
+from pygmp import data, kernel, _kernel
 
 # TODO - get these from the system calls.
 # TODO - setup networking test structure
@@ -24,6 +24,19 @@ def igmp_control_msg_bytes():
 @pytest.fixture
 def igmp_ip_packet():
     return b'F\xc0\x00 \x00\x00@\x00\x01\x02\xeb\x14\n\x00\x00\x01\xef\x00\x00\x02\x94\x04\x00\x00\x16\x00\xfa\xfc\xef\x00\x00\x02'
+
+@pytest.fixture(params=[
+    (b'\x11\x00\x94\x04\xef\x00\x00\x01', data.IGMP(data.IGMPType.MEMBERSHIP_QUERY, 0, 37892, "239.0.0.1")),
+    (b'\x12\x00\x94\x04\xef\x00\x00\x02', data.IGMP(data.IGMPType.V1_MEMBERSHIP_REPORT, 0, 37892, "239.0.0.2")),
+    (b'\x16\x00\x3e\xd4\xef\x00\x00\x03', data.IGMP(data.IGMPType.V2_MEMBERSHIP_REPORT, 0, 16084, "239.0.0.3")),
+    (b'\x17\x00\x94\x04\xef\x00\x00\x04', data.IGMP(data.IGMPType.V2_LEAVE_GROUP, 0, 37892, "239.0.0.4"))])
+def igmpv12_msg(request):
+    return request.param
+
+
+@pytest.fixture
+def igmpv2_leave_bytes():
+    return b'\x17\x00\x94\x04\xef\x00\x00\x04'
 
 
 @pytest.fixture
@@ -215,6 +228,7 @@ def test_loop():
 def test_interface():
     pass # TODO
 
+
 def test_parse_igmp_control(igmp_control_msg_bytes):
     print(kernel.parse_igmp_control(igmp_control_msg_bytes))
 
@@ -224,10 +238,33 @@ def test_parse_ip_header(igmp_control_msg_bytes):
     print(kernel.parse_ip_header(igmp_control_msg_bytes))
 
 
-def test_parse_igmp(igmp_ip_packet):
-    print(kernel.parse_igmp(igmp_ip_packet[24:]))
+def test_parse_igmp(igmpv12_msg):
+    bytes_str, obj = igmpv12_msg
+    igmp_packet = kernel.parse_igmp(bytes_str)
+    assert igmp_packet == obj
+
+
+def test_parse_igmpv3_query():
+    igmpv3_query_message = b'\x11\x64\x00\x00\xef\x00\x00\x01\x00\x00\x00\x01\xc0\xa8\x01\x01'
+    igmp_packet = _kernel.parse_igmp(igmpv3_query_message)
+    print(igmp_packet)
+
+    print(data.IGMPv3Query(**igmp_packet))
+
+
+def test_parse_igmpv3_report():
+    igmpv3_report = bytearray([
+        0x22, 0x00, 0x00, 0x1c, # Type=0x22 (Membership Report), Reserved=0x00, Checksum=0x001c
+        0x00, 0x00, 0x00, 0x01, # Reserved=0x0000, Number of Group Records (N)=0x0001 (1 record)
+        0x03, 0x00, 0x00, 0x01, # Record Type=0x03, Auxiliary Data Length=0x00, Number of Sources (N)=0x0001 (1 source)
+        0xef, 0x00, 0x00, 0x04, # Multicast Address=239.0.0.4
+        0xc0, 0xa8, 0x01, 0x0a  # Source Address=192.168.1.10
+    ])
+
+    igmp_packet = _kernel.parse_igmp(bytes(igmpv3_report))
+    print(igmp_packet)
+    print(data.IGMPv3MembershipReport(**igmp_packet))
 
 
 def test_network_interfaces():
     print(kernel.network_interfaces()) # TODO
-

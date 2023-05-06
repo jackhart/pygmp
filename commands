@@ -11,6 +11,12 @@ Usage: add vif <index> <ttl threshold> <rate limit> <interface addr or index> <r
 add vif 0 1 0 10.0.0.1 0.0.0.0
 add vif 1 1 0 20.0.0.1 0.0.0.0
 
+add vif 0 10.0.0.1
+add vif 1 20.0.0.1
+
+add mfc 10.0.0.1 239.0.0.4 0
+
+
 Usage: add mfc <origin> <group> <parent> <ttls>
 add mfc 10.0.0.1 239.0.0.4 0 0,1
 

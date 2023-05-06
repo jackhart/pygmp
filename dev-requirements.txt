@@ -1,3 +1,4 @@
 pytest
 sphinx
 furo
+flake8

@@ -1,3 +1,4 @@
+import enum
 from enum import Enum
 from ipaddress import IPv4Address, ip_address
 
@@ -130,3 +131,42 @@ def test_igmp(multicast_addr):
 
     msg = data.IGMP(22, 0, 0, multicast_addr)
     assert isinstance(msg.type, Enum)
+
+
+def test_igmpv3_membership_report_init():
+    report = data.IGMPv3MembershipReport(
+        type=data.IGMPType.V3_MEMBERSHIP_REPORT,
+        checksum=0,
+        num_records=1,
+        grec_list=[data.IGMPv3Record(type=data.IGMPv3RecordType.MODE_IS_EXCLUDE,
+                                     auxwords=0,
+                                     nsrcs=0,
+                                     mca=IPv4Address('239.1.1.1'),
+                                     src_list=[])])
+
+
+def test_igmpv3_membership_report_raw_init():
+    raw_report = {
+        "type": 0x22,
+        "checksum":0,
+        "num_records": 1,
+        "grec_list": [{
+            "type": 2,
+            "auxwords": 0,
+            "nsrcs": 0,
+            "mca": "239.1.1.1",
+            "src_list": []
+        }]
+    }
+
+    report = data.IGMPv3MembershipReport(**raw_report)
+    assert report.type == data.IGMPType.V3_MEMBERSHIP_REPORT
+    assert isinstance(report.type, Enum)
+    assert len(report.grec_list) == 1
+    assert report.grec_list[0].type == data.IGMPv3RecordType.MODE_IS_EXCLUDE
+    assert isinstance(report.grec_list[0].type, Enum)
+    assert len(report.grec_list[0].src_list) == 0
+    assert isinstance(report.grec_list[0].mca, IPv4Address)
+
+
+

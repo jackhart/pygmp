@@ -1,5 +1,28 @@
-"""Common data structures.  These include dataclass wrappers around C structs and IP packets."""
+#  MIT License
+#
+#  Copyright (c) 2023 Jack Hart
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+
 from __future__ import annotations  # relevant to PEP 563 (postponed evaluation of annotations)
+
+import ipaddress
 from enum import IntEnum, Enum, EnumMeta
 from dataclasses import dataclass, fields
 from ipaddress import ip_address, IPv4Address, IPv6Address
@@ -27,10 +50,19 @@ class IPVersion(Enum):
 
 
 class IPProtocol(Enum):
-    """Protocol numbers"""
+    """IP Protocol numbers"""
     CONTROL = 0
     IGMP = 2
     PIM = 103
+
+
+class IGMPv3RecordType(Enum):
+    MODE_IS_INCLUDE = 1
+    MODE_IS_EXCLUDE = 2
+    CHANGE_TO_INCLUDE_MODE = 3
+    CHANGE_TO_EXCLUDE_MODE = 4
+    ALLOW_NEW_SOURCES = 5
+    BLOCK_OLD_SOURCES = 6
 
 
 class IGMPType(Enum):
@@ -38,9 +70,8 @@ class IGMPType(Enum):
     MEMBERSHIP_QUERY = 0x11  # Membership query
     V1_MEMBERSHIP_REPORT = 0x12  # Version 1 membership report
     V2_MEMBERSHIP_REPORT = 0x16  # Version 2 membership report
-    V2_LEAVE_GROUP = 0x17  # Leave group
+    V2_LEAVE_GROUP = 0x17  # Version 2 Leave group
     V3_MEMBERSHIP_REPORT = 0x22  # Version 3 membership report
-
 
 
 class ControlMsgType(IntEnum):
@@ -180,9 +211,54 @@ class IPHeader(Base):
 class IGMP(Base):
     """The format of an IGMP message in an IP packets payload."""
     type : IGMPType  # IGMP version
-    code: int
+    max_response_time: int
     checksum: int  # Checksum
-    group: IPv4Address | IPv6Address | str  # Group address
+    group: IPv4Address | str  # Group address
+
+
+@dataclass
+class IGMPv3MembershipReport(Base):
+    """ """
+    type: IGMPType
+    checksum: int
+    num_records: int
+    grec_list: list[IGMPv3Record | dict]
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.grec_list = [IGMPv3Record(**grec) for grec in self.grec_list if isinstance(grec, dict)]
+
+
+@dataclass
+class IGMPv3Record(Base):
+    """ """
+    type: IGMPv3RecordType
+    auxwords: int
+    nsrcs: int
+    mca: IPv4Address | str
+    src_list: list[IPv4Address | str]  # FIXME / TODO - IPv4Address obj?
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.src_list = [ipaddress.IPv4Address(src) for src in self.src_list]
+
+@dataclass
+class IGMPv3Query(Base):
+    """ """
+    type: IGMPType
+    max_response_time: int
+    checksum: int
+    group: IPv4Address | str
+    qqic: int
+    suppress: bool
+    querier_robustness: int
+    querier_query_interval: int
+    num_sources: int
+    src_list: list[IPv4Address | str]
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.src_list = [ipaddress.IPv4Address(src) for src in self.src_list]
 
 
 @dataclass
@@ -199,18 +275,21 @@ class VIFTableEntry(Base):
     remote_addr: IPv4Address | IPv6Address | str
 
 
-
 @dataclass
 class VifCtl(Base):
-    """Used in MRT_ADD_VIF and MRT_DEL_VIF
-        Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L61
-    """
-    vifi: int  # VIF index
-    threshold: int = 1  # TTL threshold - minimum TTL packet must have to be forwarded on vif.  Typically 1
-    rate_limit: int = 0  # Rate limiter values (NI)
-    lcl_addr: IPv4Address | IPv6Address | str | int = ip_address("0.0.0.0")  # Local interface address or index
-    rmt_addr: IPv4Address | IPv6Address | str = ip_address("0.0.0.0")  # Remote address (NI)
+    """Used in MRT_ADD_VIF and MRT_DEL_VIF.  Based off the Linux struct: https://github.com/torvalds/linux/blob/master/include/uapi/linux/mroute.h#L61
 
+        :param vifi: VIF index
+        :param lcl_addr: Local interface address or index
+        :param threshold: TTL threshold - minimum TTL packet must have to be forwarded on vif.  Typically, 1
+        :param rate_limit Rate limiter values (Not Implemented in Linux)
+        :param rmt_addr: IPIP tunnel address
+    """
+    vifi: int
+    lcl_addr: IPv4Address | IPv6Address | str | int
+    rmt_addr: IPv4Address | IPv6Address | str = ip_address("0.0.0.0")
+    threshold: int = 1
+    rate_limit: int = 0
 
 
 @dataclass
@@ -226,9 +305,11 @@ class MFCEntry(Base):
 
 
 def _get_type(type_obj: str | type) -> type:
-    """Get the type from the type hint."""
+    """Get the type from the type hint.
+
+    :param type_obj: str | type: Specify that the type_obj parameter can be either a string or a type
+    :return: The type of the argument
+    """
     if isinstance(type_obj, type):
         return type_obj
     return eval(type_obj)
-
-
