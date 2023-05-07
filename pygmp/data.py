@@ -33,7 +33,7 @@ from pygmp import _kernel
 
 @dataclass
 class Base:
-    """"Base dataclass for all other dataclasses"""
+    """Base dataclass for all other dataclasses"""
     def __post_init__(self):
         for field in fields(self):
             if isinstance(_get_type(field.type), EnumMeta):
@@ -45,42 +45,46 @@ class Base:
 
 
 class IPVersion(Enum):
-    IPv4 = 4
-    IPv6 = 6
+    """IP version"""
+    IPv4 = 4  #: IP version 4
+    IPv6 = 6  #: IP version 6
 
 
 class IPProtocol(Enum):
-    """IP Protocol numbers"""
-    CONTROL = 0
-    IGMP = 2
-    PIM = 103
+    """IP message protocol."""
+    CONTROL = 0  #: Control message sent by kernel over IGMP socket.  Has no IP protocol number.
+    IGMP = 2  #: Internet Group Management Protocol (IGMP)
+    PIM = 103  #: Protocol Independent Multicast (PIM)
 
 
 class IGMPv3RecordType(Enum):
-    MODE_IS_INCLUDE = 1
-    MODE_IS_EXCLUDE = 2
-    CHANGE_TO_INCLUDE_MODE = 3
-    CHANGE_TO_EXCLUDE_MODE = 4
-    ALLOW_NEW_SOURCES = 5
-    BLOCK_OLD_SOURCES = 6
+    """IGMPv3 Query Report record type"""
+    MODE_IS_INCLUDE = 1  #: Response by interface in INCLUDE mode. Can receive traffic from the listed sources.
+    MODE_IS_EXCLUDE = 2  #: Response by interface in EXCLUDE mode.  Ignoring traffic from the listed sources.
+    CHANGE_TO_INCLUDE_MODE = 3  #: Interface changing to INCLUDE mode for multicast address.
+    CHANGE_TO_EXCLUDE_MODE = 4  #: Interface changing to EXCLUDE mode for multicast address.
+    ALLOW_NEW_SOURCES = 5  #: Either add new sources to the INCLUDE list or delete from the EXCLUDE list.
+    BLOCK_OLD_SOURCES = 6  #: Either add new sources to the EXCLUDE list or delete from the INCLUDE list.
 
 
 class IGMPType(Enum):
-    """IGMP message types"""
-    MEMBERSHIP_QUERY = 0x11  # Membership query
-    V1_MEMBERSHIP_REPORT = 0x12  # Version 1 membership report
-    V2_MEMBERSHIP_REPORT = 0x16  # Version 2 membership report
-    V2_LEAVE_GROUP = 0x17  # Version 2 Leave group
-    V3_MEMBERSHIP_REPORT = 0x22  # Version 3 membership report
+    """Internet Group Management Protocol (IGMP) message type"""
+    MEMBERSHIP_QUERY = 0x11  #: Membership query
+    V1_MEMBERSHIP_REPORT = 0x12  #: Version 1 membership report
+    V2_MEMBERSHIP_REPORT = 0x16  #: Version 2 membership report
+    V2_LEAVE_GROUP = 0x17  #: Version 2 Leave group
+    V3_MEMBERSHIP_REPORT = 0x22  #: Version 3 membership report
 
 
 class ControlMsgType(IntEnum):
-    IGMPMSG_NOCACHE = _kernel.IGMPMSG_NOCACHE
-    IGMPMSG_WRONGVIF = _kernel.IGMPMSG_WRVIFWHOLE
-    IGMPMSG_WHOLEPKT = _kernel.IGMPMSG_WHOLEPKT
+    """Kernel's control message type"""
+    IGMPMSG_NOCACHE = _kernel.IGMPMSG_NOCACHE  #: Got IGMP message for VIP with no matching multicast cache entry
+    IGMPMSG_WRONGVIF = _kernel.IGMPMSG_WRVIFWHOLE  #: ... TODO
+    IGMPMSG_WHOLEPKT = _kernel.IGMPMSG_WHOLEPKT  #:  ... TODO
 
 
 class InterfaceFlags(IntEnum):
+    """Linux network interface flags"""
     UP = 1 << 0
     BROADCAST = 1 << 1
     DEBUG = 1 << 2
@@ -108,87 +112,51 @@ class InterfaceFlags(IntEnum):
 
 @dataclass
 class IpMreq(Base):
-    """Request structure for multicast socket operations.
-
-        Attributes:
-            multiaddr (IPv4Address | IPv6Address | str): IP multicast address of the group.
-            interface (IPv4Address | IPv6Address | str): Local IP address of the interface.
-    """
+    """Request structure for multicast socket operations."""
     format = "4s 4s"
-    multiaddr: IPv4Address | IPv6Address | str  # IP multicast address of group
-    interface: IPv4Address | IPv6Address | str  # local IP address of interface
+    multiaddr: IPv4Address | IPv6Address | str #: IP multicast address of the group.
+    interface: IPv4Address | IPv6Address | str #: Local IP address of the interface.
 
 
 @dataclass
 class VifReq(Base):
-    """Data class for Virtual Interface (VIF) information used in SIOCGETVIFCNT ioctl call.
-
-        Attributes:
-            vifi (int): VIF index.
-            icount (int, optional): Input packet count. Defaults to 0.
-            ocount (int, optional): Output packet count. Defaults to 0.
-            ibytes (int, optional): Input byte count. Defaults to 0.
-            obytes (int, optional): Output byte count. Defaults to 0.
-    """
+    """Data class for Virtual Interface (VIF) information used in `SIOCGETVIFCNT` ioctl call."""
     format = "HLLLL"
-    vifi: int  # VIF index
-    icount: int = 0 # Input packet count
-    ocount: int = 0  # Output packet count
-    ibytes: int = 0 # Input byte count
-    obytes: int  = 0 # Output byte count
+    vifi: int  #: VIF index
+    icount: int = 0  #: Input packet count
+    ocount: int = 0   #: Output packet count
+    ibytes: int = 0  #: Input byte count
+    obytes: int  = 0  #: Output byte count
 
 
 @dataclass
 class SGReq(Base):
-    """Data class for 'Source-Group Request', used in SIOCGETSGCNT ioctl call.
-
-        Attributes:
-            src (IPv4Address | IPv6Address | str): Source IP address.
-            grp (IPv4Address | IPv6Address | str): Group IP address.
-            pktcnt (int, optional): Packet count. Defaults to 0.
-            bytecnt (int, optional): Byte count. Defaults to 0.
-            wrong_if (int, optional): Wrong interface count. Defaults to 0.
-    """
+    """Data class for 'Source-Group Request', used in `SIOCGETSGCNT` ioctl call."""
     format = "4s 4s LLL"
-    src: IPv4Address | IPv6Address | str
-    grp: IPv4Address | IPv6Address | str
-    pktcnt: int = 0
-    bytecnt: int = 0
-    wrong_if: int = 0
+    src: IPv4Address | IPv6Address | str  #: Source IP address
+    grp: IPv4Address | IPv6Address | str  #: Group IP address
+    pktcnt: int = 0  #: Packet count
+    bytecnt: int = 0  #: Byte count
+    wrong_if: int = 0  #: Wrong interface count
 
 
 @dataclass
 class MfcCtl(Base):
-    """Data class for Multicast Forwarding Cache (MFC) control, used in MRT_ADD_MFC and MRT_DEL_MFC calls.
-
-        Attributes:
-            origin (IPv4Address | IPv6Address | str): Originating IP address, used in Source-Specific Multicast (SSM).
-            mcastgroup (IPv4Address | IPv6Address | str): Multicast group address.
-            parent (int): Parent VIF index, where the packet arrived (incoming interface index).
-            ttls (list): List of minimum TTL thresholds for forwarding on VIFs.
-            expire (int, optional): Time in seconds after which the cache entry will be deleted. Defaults to 0.
-    """
-    origin: IPv4Address | IPv6Address | str  # Originating ip - used in source-specific multicast (SSM)
-    mcastgroup: IPv4Address | IPv6Address | str  # Multicast address
-    parent: int  # Parent vif - where packet arrived - incoming interface index
-    ttls: list  # Minimum TTL thresholds for forwarding on vifs
-    expire: int = 0  # time in seconds after which the cache entry will be deleted  TODO - add to method
+    """Data class for Multicast Forwarding Cache (MFC) control, used in `MRT_ADD_MFC` and `MRT_DEL_MFC` calls."""
+    origin: IPv4Address | IPv6Address | str  #: Originating IP address, used in Source-Specific Multicast (SSM)
+    mcastgroup: IPv4Address | IPv6Address | str  #: Multicast group address
+    parent: int  #: Parent VIF index, where the packet arrived (incoming interface index)
+    ttls: list  #: List of minimum TTL thresholds for forwarding on VIFs
+    expire: int = 0  #: Time in seconds after which the cache entry will be deleted  TODO - not yet supported
 
 
 @dataclass
 class Interface(Base):
-    """Data class representing a network interface.
-
-        Attributes:
-            name (str): Interface name.
-            index (int): Interface index.
-            flags (set[InterfaceFlags] | int): Interface flags.
-            addresses (list[str], optional): List of IP addresses associated with the interface. Defaults to empty list.
-    """
-    name: str
-    index: int
-    flags: set[InterfaceFlags] | int
-    addresses: list[str] = None
+    """Data class representing a network interface with all associated addresses."""
+    name: str  #: Interface name
+    index: int  #: Interface index
+    flags: set[InterfaceFlags] | int  #: Interface flags
+    addresses: list[str] = None  #: List of IP addresses associated with the interface
 
     def __post_init__(self):
         super().__post_init__()
@@ -200,84 +168,47 @@ class Interface(Base):
 
 @dataclass
 class IGMPControl(Base):
-    """Data class representing the format sent from kernel over the IGMP socket.
-
-        Attributes:
-            msgtype (ControlMsgType): Control message type.
-            mbz (int): Must be zero.
-            vif (int): Low 8 bits of VIF number.
-            vif_hi (int): High 8 bits of VIF number.
-            im_src (IPv4Address | IPv6Address | str): IP address of source of packet.
-            im_dst (IPv4Address | IPv6Address | str): IP address of destination of packet.
-    """
-    msgtype: ControlMsgType  # control message type
-    mbz: int  # Must be zero
-    vif: int  # Low 8 bits of VIF number
-    vif_hi: int  # High 8 bits of VIF number
-    im_src: IPv4Address | IPv6Address | str   # IP address of source of packet
-    im_dst: IPv4Address | IPv6Address | str   # IP address of destination of packet
+    """Data class representing the control message sent from kernel over the IGMP socket."""
+    msgtype: ControlMsgType  #: Control message type
+    mbz: int  #: Must be zero
+    vif: int  #: Low 8 bits of VIF number
+    vif_hi: int  #: High 8 bits of VIF number
+    im_src: IPv4Address | IPv6Address | str   #: IP address of source of packet
+    im_dst: IPv4Address | IPv6Address | str   #: IP address of destination of packet
 
 
 @dataclass
 class IPHeader(Base):
-    """Data class representing an IP header.
-
-        Attributes:
-            version (IPVersion): IP version.
-            ihl (int): Internet Header Length.
-            tos (int): Type of service.
-            tot_len (int): Total length.
-            id (int): Identification.
-            frag_off (int): Fragment offset.
-            ttl (int): Time to live.
-            protocol (IPProtocol): Protocol.
-            check (int): Header checksum.
-            src_addr (IPv4Address | IPv6Address | str): Source address.
-            dst_addr (IPv4Address | IPv6Address | str): Destination address.
-"""
-    version: IPVersion
-    ihl: int
-    tos: int
-    tot_len: int
-    id: int
-    frag_off: int
-    ttl: int
-    protocol: IPProtocol
-    check: int
-    src_addr: IPv4Address | IPv6Address | str
-    dst_addr: IPv4Address | IPv6Address | str
+    """Data class representing an IP header."""
+    version: IPVersion  #: IP version
+    ihl: int  #: Internet Header Length
+    tos: int  #: Type of service
+    tot_len: int  #: Total length
+    id: int  #: Identification
+    frag_off: int  #: Fragment offset
+    ttl: int  #: Time to live
+    protocol: IPProtocol  #: IP Protocol
+    check: int  #: Checksum
+    src_addr: IPv4Address | IPv6Address | str  #: IP source address
+    dst_addr: IPv4Address | IPv6Address | str  #: IP destination address
 
 
 @dataclass
 class IGMP(Base):
-    """Data class representing the format of an IGMP message in an IP packet's payload.
-
-        Attributes:
-            type (IGMPType): IGMP version.
-            max_response_time (int): Maximum response time.
-            checksum (int): Checksum.
-            group (IPv4Address | str): Group address.
-    """
-    type : IGMPType
-    max_response_time: int
-    checksum: int
-    group: IPv4Address | str
+    """Data class representing the format of an IGMP message in an IP packet's payload."""
+    type : IGMPType  #: IGMP version
+    max_response_time: int  #: Maximum response time
+    checksum: int  #: Checksum
+    group: IPv4Address | str  #: Group address
 
 
 @dataclass
 class IGMPv3MembershipReport(Base):
-    """Data class representing the format of an IGMP message in an IP packet's payload.
-
-        Attributes:
-            type (IGMPType): IGMP version.
-            max_response_time (int): Maximum response time.
-            checksum (int): Checksum.
-            group (IPv4Address | str): Group address.
-    """
-    type: IGMPType
-    checksum: int
-    num_records: int
-    grec_list: list[IGMPv3Record | dict]
+    """Data class representing the format of an IGMP message in an IP packet's payload."""
+    type: IGMPType  #: IGMP version
+    checksum: int  #: Checksum
+    num_records: int  #: Number of records
+    grec_list: list[IGMPv3Record | dict]  #: List of records
 
     def __post_init__(self):
         super().__post_init__()
@@ -286,51 +217,31 @@ class IGMPv3MembershipReport(Base):
 
 @dataclass
 class IGMPv3Record(Base):
-    """Data class representing an IGMPv3 Record used in IGMPv3 Membership Report messages.
-
-        Attributes:
-            type (IGMPv3RecordType): IGMPv3 record type.
-            auxwords (int): Auxiliary words.
-            nsrcs (int): Number of sources.
-            mca (IPv4Address | str): Multicast address.
-            src_list (list[IPv4Address | str]): Source list.
-    """
-    type: IGMPv3RecordType
-    auxwords: int
-    nsrcs: int
-    mca: IPv4Address | str
-    src_list: list[IPv4Address | str]  # FIXME / TODO - IPv4Address obj?
+    """Data class representing a record in a IGMPv3 Membership Report messages."""
+    type: IGMPv3RecordType  #: Record type
+    auxwords: int  #: Auxiliary data length
+    nsrcs: int  #: Number of sources
+    mca: IPv4Address | str  #: Multicast address
+    src_list: list[IPv4Address | str]  # Source address list
 
     def __post_init__(self):
         super().__post_init__()
         self.src_list = [ipaddress.IPv4Address(src) for src in self.src_list]
 
+
 @dataclass
 class IGMPv3Query(Base):
-    """Data class representing an IGMPv3 Query.
-
-        Attributes:
-            type (IGMPType): IGMP type.
-            max_response_time (int): Maximum response time.
-            checksum (int): Checksum.
-            group (IPv4Address | str): Group address.
-            qqic (int): Querier's Query Interval Code.
-            suppress (bool): Suppress flag.
-            querier_robustness (int): Querier robustness variable.
-            querier_query_interval (int): Querier query interval.
-            num_sources (int): Number of sources.
-            src_list (list[IPv4Address | str]): Source list.
-    """
-    type: IGMPType
-    max_response_time: int
-    checksum: int
-    group: IPv4Address | str
-    qqic: int
-    suppress: bool
-    querier_robustness: int
-    querier_query_interval: int
-    num_sources: int
-    src_list: list[IPv4Address | str]
+    """Data class representing an IGMPv3 Query."""
+    type: IGMPType  #: IGMP type
+    max_response_time: int  #: Maximum response time
+    checksum: int  #: Checksum
+    group: IPv4Address | str  #: Group address
+    qqic: int  #: Querier's Query Interval Code
+    suppress: bool  #: Suppress flag
+    querier_robustness: int  #: Querier robustness variable
+    querier_query_interval: int  #: Querier query interval
+    num_sources: int  #: Number of sources
+    src_list: list[IPv4Address | str]  #: Source list
 
     def __post_init__(self):
         super().__post_init__()
@@ -339,78 +250,42 @@ class IGMPv3Query(Base):
 
 @dataclass
 class VIFTableEntry(Base):
-    """Data class representing an entry in the VIF table at /proc/net/ip_mr_vif.
-
-        Attributes:
-            index (int): VIF index.
-            interface (str): Interface name.
-            bytes_in (int): Number of bytes received.
-            pkts_in (int): Number of packets received.
-            bytes_out (int): Number of bytes transmitted.
-            pkts_out (int): Number of packets transmitted.
-            flags (int): Flags.
-            local_addr (IPv4Address | IPv6Address | str): Local IP address.
-            remote_addr (IPv4Address | IPv6Address | str): Remote IP address.
-    """
-    index: int
-    interface: str
-    bytes_in: int
-    pkts_in: int
-    bytes_out: int
-    pkts_out: int
-    flags: int
-    local_addr: IPv4Address | IPv6Address | str
-    remote_addr: IPv4Address | IPv6Address | str
+    """Data class representing an entry in the VIF table at `/proc/net/ip_mr_vif`."""
+    index: int  #: VIF index
+    interface: str  #: Interface name
+    bytes_in: int  #: Number of bytes received
+    pkts_in: int  #: Number of packets received
+    bytes_out: int  #: Number of bytes transmitted
+    pkts_out: int  #: Number of packets transmitted
+    flags: int  #: Flags
+    local_addr: IPv4Address | IPv6Address | str  #: Local IP address
+    remote_addr: IPv4Address | IPv6Address | str  #: Remote IP address
 
 
 @dataclass
 class VifCtl(Base):
-    """Data class used in MRT_ADD_VIF and MRT_DEL_VIF.
-
-        Attributes:
-            vifi (int): VIF index.
-            lcl_addr (IPv4Address | IPv6Address | str | int): Local interface address or index.
-            rmt_addr (IPv4Address | IPv6Address | str, optional): IPIP tunnel address. Defaults to ip_address("0.0.0.0").
-            threshold (int, optional): TTL threshold. Defaults to 1.
-            rate_limit (int, optional): Rate limiter values (Not Implemented in Linux). Defaults to 0.
-    """
-    vifi: int
-    lcl_addr: IPv4Address | IPv6Address | str | int
-    rmt_addr: IPv4Address | IPv6Address | str = ip_address("0.0.0.0")
-    threshold: int = 1
-    rate_limit: int = 0
+    """Data class used in `MRT_ADD_VIF` and `MRT_DEL_VIF`."""
+    vifi: int  #: VIF index
+    lcl_addr: IPv4Address | IPv6Address | str | int  #: Local interface address or index
+    rmt_addr: IPv4Address | IPv6Address | str = ip_address("0.0.0.0")  #: IPIP tunnel address
+    threshold: int = 1  #: TTL threshold
+    rate_limit: int = 0  #: Rate limiter values (Not Implemented in Linux)
 
 
 @dataclass
 class MFCEntry(Base):
-    """Data class representing an entry in the MFC table at /proc/net/ip_mr_cache.
-
-        Attributes:
-            group (IPv4Address | IPv6Address | str): Multicast group address.
-            origin (IPv4Address | IPv6Address | str): Originating IP address.
-            iif (int): Incoming interface index.
-            packets (int): Packet count.
-            bytes (int): Byte count.
-            wrong_if (int): Wrong incoming interface count.
-            oifs (dict[int, int]): Outgoing interfaces and their TTLs (outgoing_if_indx : ttl).
-    """
-    group: IPv4Address | IPv6Address | str
-    origin: IPv4Address | IPv6Address | str
-    iif: int
-    packets: int
-    bytes: int
-    wrong_if: int
-    oifs: dict[int, int]  # outgoing_if_indx : ttl
+    """Data class representing an entry in the MFC table at `/proc/net/ip_mr_cache`."""
+    group: IPv4Address | IPv6Address | str  #: Multicast group address
+    origin: IPv4Address | IPv6Address | str  #: Originating IP address
+    iif: int  #: Incoming interface index
+    packets: int  #: Packet count
+    bytes: int  #: Byte count
+    wrong_if: int  #: Wrong incoming interface count
+    oifs: dict[int, int]  #: Outgoing interface indices and their minimum TTLs for the route
 
 
 def _get_type(type_obj: str | type) -> type:
-    """Get the type from the type hint.
-
-        Args:
-            type_obj: str | type: Specify that the type_obj parameter can be either a string or a type
-        Returns:
-            The type of the argument.
-    """
+    """Get the type from the type hint."""
     if isinstance(type_obj, type):
         return type_obj
     return eval(type_obj)

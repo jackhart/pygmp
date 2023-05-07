@@ -1,6 +1,4 @@
-"""
-TODO:
-    Investigate syscalls that are not yet implemented.
+""" # TODO Investigate syscalls that are not yet implemented.
         - MRT_TABLE -- Linux only, support for multiple MRT tables.  (e.g,, for multiple routing daemons)
         - MRT_ADD_MFC_PROXY
         - MRT_DEL_MFC_PROXY

@@ -1,5 +1,7 @@
 import os
 import sys
+from dataclasses import is_dataclass
+
 sys.path.insert(0, os.path.abspath('..'))
 
 # Configuration file for the Sphinx documentation builder.
@@ -19,6 +21,7 @@ release = '0.0.1'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon']
+napoleon_attr_annotations = True
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
@@ -33,6 +36,18 @@ html_static_path = ['_static']
 
 autodoc_typehints = "description"
 autodoc_class_signature = "separated"
+autoclass_content = "class"
+
+
+def skip(app, what, name, obj, would_skip, options):
+    if name == "__init__":
+        return True
+    return would_skip
+
+
+def setup(app):
+    print("setup is run")
+    app.connect("autodoc-skip-member", skip)
 
 html_theme_options = {
     "announcement": "<b>This project is under active development. The API is subject to change.</b>",
