@@ -48,6 +48,7 @@ PyObject *inet_ntop_with_exception(int af, const void *src) {
         }
         result = PyUnicode_FromString(mca_str);
         CHECK_NULL_AND_RAISE_NOMEMORY(result);
+
         return result;
     }
 

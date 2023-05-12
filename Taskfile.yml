@@ -15,7 +15,7 @@ tasks:
     deps: [ install ]
     interactive: true
     cmds:
-      - sudo {{.USER_WORKING_DIR}}/venv/bin/python3 pygmp interactive {{.CLI_ARGS}}
+      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 pygmp interactive {{.CLI_ARGS}}
 
   install:
     desc: Build the extension in-place and install.  Adds metadata to venv lib linking source to pygmp directory.

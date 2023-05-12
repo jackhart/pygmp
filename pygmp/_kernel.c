@@ -21,8 +21,6 @@
 // SOFTWARE.
 
 // TODO - IPV6 support
-// TODO - should I be using <netinet/ip_mroute.h>, instead?  It's the "modern api" but
-//  it doesn't seem to have the same functionality as <linux/mroute.h> (?)
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>

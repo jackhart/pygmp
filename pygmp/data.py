@@ -156,14 +156,14 @@ class Interface(Base):
     name: str  #: Interface name
     index: int  #: Interface index
     flags: set[InterfaceFlags] | int  #: Interface flags
-    addresses: list[str] = None  #: List of IP addresses associated with the interface
+    addresses: set[str] = None  #: set of IP addresses associated with the interface
 
     def __post_init__(self):
         super().__post_init__()
         if isinstance(self.flags, int):
             self.flags = InterfaceFlags.from_value(self.flags)
         if self.addresses is None:
-            self.addresses = []
+            self.addresses = set()
 
 
 @dataclass

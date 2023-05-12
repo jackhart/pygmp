@@ -53,8 +53,14 @@ basic () {
   ip netns exec basic ip link set a2 up
   ip netns exec basic ip link set a2 multicast on
 
+  ip netns exec basic ip link add a3 type dummy
+  ip netns exec basic ip link set a3 up
+  ip netns exec basic ip link set a3 multicast on
+
   ip netns exec basic ip addr add 10.0.0.1/24 dev a1
   ip netns exec basic ip addr add 20.0.0.1/24 dev a2
+  ip netns exec basic ip addr add 30.0.0.1/24 dev a3
+
   summary basic
 
 }

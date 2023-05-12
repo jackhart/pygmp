@@ -95,10 +95,20 @@ def test_mfctl(inaddr_str, multicast_addr):
 
 
 def test_interface():
-    intf = data.Interface("eth0", 0, data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, ["0.0.0.0", "192.168.2.2"])
+    intf = data.Interface("eth0", 0, data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, {"0.0.0.0", "192.168.2.2"})
     assert len(intf.flags) == 2
     assert len(intf.flags & {data.InterfaceFlags.UP, data.InterfaceFlags.MULTICAST}) == 2
     assert len(intf.addresses) == 2
+
+
+def test_interface_equivalence():
+    intf1 = data.Interface("eth0", 0, data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, {"0.0.0.0", "192.168.2.2"})
+    intf2 = data.Interface("eth0", 0, data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, {"0.0.0.0", "192.168.2.2"})
+    intf3 = data.Interface("eth0", 0, data.InterfaceFlags.UP | data.InterfaceFlags.MULTICAST, {"0.0.0.0", "10.0.0.2"})
+
+    assert intf1 == intf2
+    assert intf1 != intf3
+
 
 
 def test_igmp_control(inaddr_str, multicast_addr):

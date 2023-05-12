@@ -75,7 +75,7 @@ def interactive_shell():
 
 
 class Commands:
-    """Available commands: add_vif, add_mfc, del_vif, del_mfc, flush, status, msgs, bye help"""
+    """Available commands: add vif, add mfc, del vif, del mfc, flush, status, msgs, bye help"""
 
     def __init__(self, sock: socket.socket, queuew: queue.Queue):
         self.sock = sock
@@ -206,7 +206,7 @@ class Commands:
             Runs setsockopt with IP_ADD_MEMBERSHIP option on the socket used for multicast routing.  This tells the kernel
             to join a multicast group on the specified interface.  The kernel initially sends an IGMP join message,
             then periodically sends IGMP membership reports.  When the socket is closed, the kernel will send
-            an IGMP message to leave the group (.
+            an IGMP message to leave the group.
 
             This should not be necessary to do any multicast routing.  However, if your switch is configured with
             IGMP-snooping, sometimes IGMP messages are not properly forwarded to the router.
@@ -229,6 +229,10 @@ class Commands:
         kernel.drop_membership(self.sock, ip_mreq)
 
     def msgs(self):
+        """msgs
+
+            Prints any new messages from the kernel over the IGMP routing socket.
+        """
         print(f"# New Messages: {self.queue.qsize()}")
         while not self.queue.empty():
             print(self.queue.get())

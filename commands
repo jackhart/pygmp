@@ -4,8 +4,8 @@ export PYTHONPATH=/home/jack/Documents/projects/pygmp:$PYTHONPATH
 source venv/bin/activate
 python3 pygmp interactive
 
-ip netns exec basic python3 pygmp interactive
-ip netns exec basic ping -c 3 -W 1 -I a1 -t 2 239.0.0.4
+ip netns exec basic python3 pygmp smcrouted
+ip netns exec basic ping -c 3 -W 1 -I a3 -t 2 239.0.0.4
 
 Usage: add vif <index> <ttl threshold> <rate limit> <interface addr or index> <remote addr>
 add vif 0 1 0 10.0.0.1 0.0.0.0

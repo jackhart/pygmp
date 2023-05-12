@@ -227,7 +227,7 @@ def network_interfaces() -> dict[str, Interface]:
         if inf["name"] not in interfaces:
             interfaces[inf["name"]] = Interface(inf["name"], inf["index"], inf["flags"])
         if inf["address"]:  # TODO - any case where flags are different but name is the same?
-            interfaces[inf["name"]].addresses.append(inf["address"])
+            interfaces[inf["name"]].addresses.add(inf["address"])
 
     return interfaces
 
