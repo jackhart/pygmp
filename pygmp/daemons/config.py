@@ -27,26 +27,18 @@ from dataclasses import dataclass
 from pygmp import kernel, data
 
 
-
-@dataclass
-class Phyint:
-    interface: data.Interface
-    state: bool = False
-    ttl_threshold: int = 1
-
-
 @dataclass
 class MRoute:
     # TODO - support from address
-    from_: Phyint
+    from_: data.Interface
     group: IPv4Address
-    to: list[Phyint]
+    to: list[data.Interface]
     source: IPv4Address = ip_address("0.0.0.0")
 
 
 @dataclass
 class Config:
-    phyint: list[Phyint]
+    phyint: list[data.Interface]
     mroute: list[MRoute]
 
 
@@ -60,26 +52,16 @@ def load_config(file_name: str) -> Config:
     return Config(phyint=phyints, mroute=mroutes)
 
 
-
-def _get_phyints(config_parser: configparser.ConfigParser) -> list[Phyint]:
-    current_interfaces = kernel.network_interfaces()
-    return [Phyint(interface=_get_interface(current_interfaces, name[7:]),
-                   state=config_parser[name].getboolean("enabled", fallback=True),
-                   ttl_threshold=config_parser[name].getint("ttl_threshold", fallback=1))
-            for name in config_parser.sections() if name.startswith("phyint_")]
-
-
-def _get_mroutes(config_parser: configparser.ConfigParser, phyints: list[Phyint]) -> list[MRoute]:
-    pyints_dict = {p.interface.name: p for p in phyints}
+def _get_mroutes(config_parser: configparser.ConfigParser, phyints: list[data.Interface]) -> list[MRoute]:
+    pyints_dict = {p.name: p for p in phyints}
     mroutes = []
     for name in config_parser.sections():
         if name.startswith("mroute_"):
-            config = config_parser[name]
-            incoming_interface = _get_phyint(config.get("from"), pyints_dict=pyints_dict)
-            outgoing_interfaces = [_get_phyint(i.strip(), pyints_dict) for i in config_parser[name].get("to").split(',')]
-            group = _get_group_address(config.get("group"))
-            source = ip_address(config.get("source", fallback="0.0.0.0"))
-            mroutes.append(MRoute(from_=incoming_interface, group=group, to=outgoing_interfaces, source=source))
+            ii = pyints_dict[config_parser.get(name, "from")]
+            oil = [pyints_dict[inf] for inf in _str_list(config_parser.get(name, "to"))]
+            group = _get_group_address(config_parser.get(name, "group"))
+            source = ip_address(config_parser.get(name, "source", fallback="0.0.0.0"))
+            mroutes.append(MRoute(from_=ii, group=group, to=oil, source=source))
 
     return mroutes
 
@@ -93,15 +75,10 @@ def _get_group_address(group_address: str) -> IPv4Address:
     return group
 
 
-def _get_phyint(phyint_name, pyints_dict):
-
-    if phyint_name not in pyints_dict:
-        raise ValueError(f"phyint {phyint_name} not defined")
-
-    if not pyints_dict[phyint_name].state:
-        raise ValueError(f"phyint {phyint_name} not enabled")
-
-    return pyints_dict[phyint_name]
+def _get_phyints(config_parser: configparser.ConfigParser):
+    current_interfaces = kernel.network_interfaces()
+    names = _str_list(config_parser.get("phyints", "names", fallback=""))
+    return [_get_interface(current_interfaces, name) for name in names]
 
 
 def _get_interface(interfaces, name):
@@ -117,3 +94,7 @@ def _get_interface(interfaces, name):
         raise ValueError(f"phyint {name} is not multicast capable")
 
     return interface
+
+
+def _str_list(str_list: str) -> list[str]:
+    return [s.strip() for s in str_list.split(',')]

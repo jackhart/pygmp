@@ -22,7 +22,7 @@
 #  SOFTWARE.
 
 import argparse
-from pygmp.daemons import interactive, smcrouted
+from pygmp.daemons import interactive, simple
 
 
 def build_args():
@@ -35,8 +35,8 @@ def build_args():
     parser_a.set_defaults(daemon=interactive.main)
     # parser_b.add_argument('--baz', choices='XYZ', help='baz help')
 
-    parser_b = subparsers.add_parser('smcrouted', help='b help')
-    parser_b.set_defaults(daemon=smcrouted.main)
+    parser_b = subparsers.add_parser('simple', help='b help')
+    parser_b.set_defaults(daemon=simple.main)
 
     return parser.parse_args()
 

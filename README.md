@@ -30,7 +30,7 @@ Install the [task](https://taskfile.dev/installation) utility.  This utility is 
 
 Start the interactive shell.  (This will automatically setup the development environment.)
 ```bash
-task interactive
+task run
 ```
 
 ### Roadmap

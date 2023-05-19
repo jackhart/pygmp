@@ -33,6 +33,7 @@ from typing import TypeVar
 import socket
 import fcntl
 from ipaddress import ip_address, IPv4Address, IPv6Address
+import hashlib
 
 from pygmp.data import VifReq, IpMreq, VifCtl, MfcCtl, SGReq, IPHeader, \
     IGMPControl, Interface, VIFTableEntry, MFCEntry, \
@@ -43,6 +44,24 @@ from pygmp import _kernel
 # This naming is used to distinguish socket types between methods.
 InetRawSocketType = TypeVar("InetRawSocketType", bound=socket.socket)  # FIXME - no good way to type a raw socket
 InetAnySocket = TypeVar("InetAnySocket", bound=socket.socket)
+
+
+def _file_cache(filename):
+    # TODO - utilities module
+    def file_cache_wrapper(func):
+        cache = {'last_hash': None, 'result': None}
+        def wrapper():
+            with open(filename, 'r') as f:
+                content = f.read()
+            new_hash = hashlib.md5(content.encode()).hexdigest()
+
+            if new_hash != cache['last_hash']:
+                cache['result'] = func()
+                cache['last_hash'] = new_hash
+
+            return cache['result']
+        return wrapper
+    return file_cache_wrapper
 
 
 @contextmanager
@@ -231,7 +250,7 @@ def network_interfaces() -> dict[str, Interface]:
 
     return interfaces
 
-
+@_file_cache("/proc/net/ip_mr_vif")
 def ip_mr_vif() -> list[VIFTableEntry]:
     """Parse the /proc/net/ip_mr_vif file.  Linux specific, holds the IPv4 virtual interfaces used by the active multicast routing daemon.
 
@@ -257,6 +276,7 @@ def ip_mr_vif() -> list[VIFTableEntry]:
     return vifs
 
 
+@_file_cache("/proc/net/ip_mr_cache")
 def ip_mr_cache() -> list[MFCEntry]:
     """Parse the /proc/net/ip_mr_cache file.  Linux specific, holds the multicast routing cache.
 
