@@ -1,7 +1,6 @@
-""" # TODO Investigate syscalls that are not yet implemented.
-        - MRT_TABLE -- Linux only, support for multiple MRT tables.  (e.g,, for multiple routing daemons)
-        - MRT_ADD_MFC_PROXY
-        - MRT_DEL_MFC_PROXY
+""" # TODO Investigate syscalls:
+        - MRT_TABLE -- Linux can support multiple MRT tables.
+        - MRT_ADD_MFC_PROXY / MRT_DEL_MFC_PROXY -- It is unclear to me what these do.
         - SIOCGETRPF  -- Get the RPF neighbor for a given source and group?
 """
 #  MIT License
@@ -25,43 +24,28 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-
 from __future__ import annotations
 import struct
 from contextlib import contextmanager
 from typing import TypeVar
 import socket
 import fcntl
-from ipaddress import ip_address, IPv4Address, IPv6Address
-import hashlib
+from ipaddress import ip_address
+
 
 from pygmp.data import VifReq, IpMreq, VifCtl, MfcCtl, SGReq, IPHeader, \
     IGMPControl, Interface, VIFTableEntry, MFCEntry, \
     IGMP, IGMPType, IGMPv3Query, IGMPv3MembershipReport
+from pygmp import utils
 from pygmp import _kernel
 
+
+IP_MR_CACHE_DIR = "/proc/net/ip_mr_cache"
+IP_MR_VIF_DIR = "/proc/net/ip_mr_vif"
 
 # This naming is used to distinguish socket types between methods.
 InetRawSocketType = TypeVar("InetRawSocketType", bound=socket.socket)  # FIXME - no good way to type a raw socket
 InetAnySocket = TypeVar("InetAnySocket", bound=socket.socket)
-
-
-def _file_cache(filename):
-    # TODO - utilities module
-    def file_cache_wrapper(func):
-        cache = {'last_hash': None, 'result': None}
-        def wrapper():
-            with open(filename, 'r') as f:
-                content = f.read()
-            new_hash = hashlib.md5(content.encode()).hexdigest()
-
-            if new_hash != cache['last_hash']:
-                cache['result'] = func()
-                cache['last_hash'] = new_hash
-
-            return cache['result']
-        return wrapper
-    return file_cache_wrapper
 
 
 @contextmanager
@@ -106,22 +90,14 @@ def disable_mrt(sock: InetRawSocketType) -> None:
 
 def enable_pim(sock: InetRawSocketType) -> None:
     """Enable PIM code & PIM assert mode in the kernel.
-
-        FIXME - the distinction between PIM and PIM assert mode is not clear.
-            - If PIM is disabled and you enable assert, PIM will be enabled.
-            - If PIM assert is disabled, you cannot enable PIM.
+        TODO - the practical distinction between PIM and PIM assert mode is not clear.
     """
     sock.setsockopt(socket.IPPROTO_IP, _kernel.MRT_PIM, 1)
     sock.setsockopt(socket.IPPROTO_IP, _kernel.MRT_ASSERT, 1)
 
 
 def disable_pim(sock: InetRawSocketType) -> None:
-    """Disable PIM code & PIM assert mode in the kernel.
-
-        FIXME - the distinction between PIM and PIM assert mode is not clear.
-            - If PIM is disabled and you enable assert, PIM will be enabled.
-            - If PIM assert is disabled, you cannot enable PIM.
-    """
+    """Disable PIM code & PIM assert mode in the kernel."""
     sock.setsockopt(socket.IPPROTO_IP, _kernel.MRT_PIM, 0)
     sock.setsockopt(socket.IPPROTO_IP, _kernel.MRT_ASSERT, 0)
 
@@ -133,11 +109,7 @@ def pim_is_enabled(sock: InetRawSocketType) -> bool:
 
 
 def add_vif(sock: InetRawSocketType, vifctl: VifCtl) -> None:
-    """Add a multicast VIF to the kernel multicast routing table.
-
-        :parameter sock: The IGMP socket.
-        :parameter vifctl: Metadata to create the new VIF.
-    """
+    """Add a multicast VIF to the kernel multicast routing table."""
     _kernel.add_vif(sock, vifctl.vifi, vifctl.threshold, vifctl.rate_limit, str(vifctl.lcl_addr), str(vifctl.rmt_addr))
 
 
@@ -176,7 +148,7 @@ def del_mfc(sock: InetRawSocketType, mfcctl: MfcCtl) -> None:
 
 def flush(sock: InetRawSocketType, vifs=True, mfc=True, static=True) -> None:
     """Flush data in the kernel multicast routing table.
-        TODO - it is not clear to me how/when static VIFs and MFCs are created.
+        TODO - I do not understand the practical distinction between static and non-static entries.
     """
     vifs_mask = vifs * (_kernel.MRT_FLUSH_VIFS | (static * _kernel.MRT_FLUSH_VIFS_STATIC))
     mfc_mask = mfc * (_kernel.MRT_FLUSH_MFC | (static * _kernel.MRT_FLUSH_MFC_STATIC))
@@ -184,25 +156,22 @@ def flush(sock: InetRawSocketType, vifs=True, mfc=True, static=True) -> None:
 
 
 def add_membership(sock: InetAnySocket, ip_mreq: IpMreq) -> None:
-    """add membership <ip_mreq>
+    """Runs setsockopt with IP_ADD_MEMBERSHIP option on the socket used for multicast routing.
 
-        Runs setsockopt with IP_ADD_MEMBERSHIP option on the socket used for multicast routing.  This tells the kernel
-        to join a multicast group on the specified interface.  The kernel sends an IGMP message to join the group
-        initially, and then it periodically sends IGMP membership reports to maintain the membership.  When the socket
-        is closed, the kernel will send an IGMP message to leave the group.
-
-        This should not be necessary to do any multicast routing.  However, if your switch is configured with
-        IGMP-snooping, sometimes IGMP messages are not properly forwarded to the router.
+        This tells the kernel to join a multicast group on the specified interface.  The kernel sends an IGMP message
+        to join the group initially, and then it periodically sends IGMP membership reports to maintain the membership.
+        When the socket is closed, the kernel will send an IGMP message to leave the group.  This should not be necessary
+        for multicast routing.  However, if your switch is configured with IGMP-snooping, sometimes IGMP messages are
+        not properly forwarded to the router.
     """
     mreq_buff = struct.pack(ip_mreq.format, ip_mreq.multiaddr.packed, ip_mreq.interface.packed)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq_buff)
 
 
 def drop_membership(sock: InetAnySocket, ip_mreq: IpMreq) -> None:
-    """drop membership.
+    """Runs setsockopt with IP_DROP_MEMBERSHIP option on the socket used for multicast routing.
 
-        Runs setsockopt with IP_DROP_MEMBERSHIP option on the socket used for multicast routing.  This tells the kernel
-        to send an IGMP message to leave the specified group.
+        This tells the kernel to send an IGMP message to leave the specified group.
     """
     mreq_buff = struct.pack(ip_mreq.format, ip_mreq.multiaddr.packed, ip_mreq.interface.packed)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq_buff)
@@ -250,7 +219,8 @@ def network_interfaces() -> dict[str, Interface]:
 
     return interfaces
 
-@_file_cache("/proc/net/ip_mr_vif")
+
+@utils.file_cache(IP_MR_VIF_DIR)
 def ip_mr_vif() -> list[VIFTableEntry]:
     """Parse the /proc/net/ip_mr_vif file.  Linux specific, holds the IPv4 virtual interfaces used by the active multicast routing daemon.
 
@@ -260,23 +230,24 @@ def ip_mr_vif() -> list[VIFTableEntry]:
 
         Raises FileNotFoundError if the file does not exist.
 
-        FIXME - local_address will be index if MRT_ADD_VIF is called with one.  Currently, it is converted to an IP address.
-
     """
     vifs = []
-    with open('/proc/net/ip_mr_vif', 'r') as f:
+    with open(IP_MR_VIF_DIR, 'r') as f:
         next(f) # skip header line
         for line in f:
             fields = line.split()
-            index, iface = int(fields[0]), fields[1]
-            byin, pin, byout, pout, flags = int(fields[2]), int(fields[3]), int(fields[4]), int(fields[5]), int(fields[6])
-            local, remote = host_hex_to_ip(fields[7]), host_hex_to_ip(fields[8])
-            vifs.append(VIFTableEntry(index, iface, byin, pin, byout, pout, flags, local, remote))
+            index, name, flags = int(fields[0]), fields[1], int(fields[6])
+            local = int(fields[7], 16) if flags & _kernel.VIFF_USE_IFINDEX else utils.host_hex_to_ip(fields[7])
+            remote = utils.host_hex_to_ip(fields[8])
+            vifs.append(VIFTableEntry(index=index, name=name,
+                                      bytes_in=int(fields[2]), pkts_in=int(fields[3]),
+                                      bytes_out=int(fields[4]), pkts_out=int(fields[5]), flags=flags,
+                                      local_addr_or_interface=local, remote_addr=remote))
 
     return vifs
 
 
-@_file_cache("/proc/net/ip_mr_cache")
+@utils.file_cache(IP_MR_CACHE_DIR)
 def ip_mr_cache() -> list[MFCEntry]:
     """Parse the /proc/net/ip_mr_cache file.  Linux specific, holds the multicast routing cache.
 
@@ -287,33 +258,19 @@ def ip_mr_cache() -> list[MFCEntry]:
         Raises FileNotFoundError if the file does not exist.
 
     """
-    with open('/proc/net/ip_mr_cache', 'r') as f:
+    with open(IP_MR_CACHE_DIR, 'r') as f:
         next(f) # skip header line
         entries = []
         for line in f:
             fields = line.strip().split()
 
             if len(fields) < 6 :
-                raise ValueError("Encountered malformed line in /proc/net/ip_mr_cache: " + line)
+                raise ValueError(f"Encountered malformed line in {IP_MR_CACHE_DIR}: {line}")
 
             oifs = _parse_index_ttl(fields[6:]) if len(fields) > 6 else dict()
-            group, origin = host_hex_to_ip(fields[0]), host_hex_to_ip(fields[1])
+            group, origin = utils.host_hex_to_ip(fields[0]), utils.host_hex_to_ip(fields[1])
             entries.append(MFCEntry(group, origin, int(fields[2]), int(fields[3]), int(fields[4]), int(fields[5]), oifs))
     return entries
-
-
-def host_hex_to_ip(hex_val: str) -> IPv4Address | IPv6Address:
-    """Convert a hex string to an IP address.
-
-        IP addresses are typically represented in network byte order (big-endian),
-        whereas the host byte order can be little-endian depending on the architecture.
-
-        TODO - system dependent... Not sure if we always need to reverse the bytes?
-    """
-    host_order = bytearray.fromhex(hex_val)
-    host_order.reverse()
-    big_endian = bytes(host_order)
-    return ip_address(big_endian)
 
 
 def _parse_index_ttl(pairs_list: list[str]) -> dict[int, int]:

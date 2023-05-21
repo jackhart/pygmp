@@ -147,7 +147,7 @@ class MfcCtl(Base):
     mcastgroup: IPv4Address | IPv6Address | str  #: Multicast group address
     parent: int  #: Parent VIF index, where the packet arrived (incoming interface index)
     ttls: list  #: List of minimum TTL thresholds for forwarding on VIFs
-    expire: int = 0  #: Time in seconds after which the cache entry will be deleted  TODO - not yet supported
+    expire: int = 0  #: Time in seconds after which the cache entry will be deleted  TODO - not supported
 
 
 @dataclass
@@ -252,14 +252,14 @@ class IGMPv3Query(Base):
 class VIFTableEntry(Base):
     """Data class representing an entry in the VIF table at `/proc/net/ip_mr_vif`."""
     index: int  #: VIF index
-    interface: str  #: Interface name
+    name: str  #: Interface name
     bytes_in: int  #: Number of bytes received
     pkts_in: int  #: Number of packets received
     bytes_out: int  #: Number of bytes transmitted
     pkts_out: int  #: Number of packets transmitted
     flags: int  #: Flags
-    local_addr: IPv4Address | IPv6Address | str  #: Local IP address
-    remote_addr: IPv4Address | IPv6Address | str  #: Remote IP address
+    local_addr_or_interface: IPv4Address | IPv6Address | int  #: Local IP address or interface index
+    remote_addr: IPv4Address | IPv6Address  #: IPIP tunnel address
 
 
 @dataclass

@@ -22,7 +22,11 @@
 #  SOFTWARE.
 
 import argparse
+
+import kernel
 from pygmp.daemons import interactive, simple
+from fastapi import FastAPI
+import uvicorn
 
 
 def build_args():
@@ -41,10 +45,9 @@ def build_args():
     return parser.parse_args()
 
 
-def main():
-    args = build_args()
-    args.daemon(args)
-
 
 if __name__ == "__main__":
-    main()
+    with kernel.igmp_socket() as sock:
+        args = build_args()
+        app = args.daemon(sock, args, FastAPI())
+        uvicorn.run(app, host="172.20.0.2", port=8000)

@@ -29,7 +29,7 @@ tasks:
     desc: Run pytests.
     deps: [ install, setup-network ]
     cmds:
-      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 -m pytest {{.CLI_ARGS}}
+      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 -m pytest -s {{.CLI_ARGS}}
 
   setup-network:
     desc: Setup the network namespaces for testing.

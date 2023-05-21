@@ -27,13 +27,17 @@ from dataclasses import dataclass
 from pygmp import kernel, data
 
 
+_DEFAULT_SOURCE = ip_address("0.0.0.0")
+_MROUTE_PREFIX = "mroute_"
+
+
 @dataclass
 class MRoute:
-    # TODO - support from address
-    from_: data.Interface
+    """Represents a multicast route."""
+    from_: str
     group: IPv4Address
-    to: list[data.Interface]
-    source: IPv4Address = ip_address("0.0.0.0")
+    to: dict[str, int]
+    source: IPv4Address = _DEFAULT_SOURCE
 
 
 @dataclass
@@ -43,45 +47,45 @@ class Config:
 
 
 def load_config(file_name: str) -> Config:
-
     config = configparser.ConfigParser()
     config.read(file_name)
 
-    phyints =  _get_phyints(config)
-    mroutes = _get_mroutes(config, phyints)
+    # TODO - better config validation
+    phyints =  _parse_phyints(config)
+    mroutes = _parse_mroutes(config)
     return Config(phyint=phyints, mroute=mroutes)
 
 
-def _get_mroutes(config_parser: configparser.ConfigParser, phyints: list[data.Interface]) -> list[MRoute]:
-    pyints_dict = {p.name: p for p in phyints}
+def _parse_mroutes(config_parser: configparser.ConfigParser) -> list[MRoute]:
     mroutes = []
     for name in config_parser.sections():
-        if name.startswith("mroute_"):
-            ii = pyints_dict[config_parser.get(name, "from")]
-            oil = [pyints_dict[inf] for inf in _str_list(config_parser.get(name, "to"))]
-            group = _get_group_address(config_parser.get(name, "group"))
+        if name.startswith(_MROUTE_PREFIX):
+            outgoing_interface_dict = _parse_outgoing_map(config_parser.get(name, "to"))
+            group = _parse_group_address(config_parser.get(name, "group"))
             source = ip_address(config_parser.get(name, "source", fallback="0.0.0.0"))
-            mroutes.append(MRoute(from_=ii, group=group, to=oil, source=source))
-
+            mroutes.append(MRoute(from_=config_parser.get(name, "from"), group=group,
+                                  to=outgoing_interface_dict, source=source))
     return mroutes
 
 
-def _get_group_address(group_address: str) -> IPv4Address:
-    group = ip_address(group_address)
-    # TODO - prefix len
+def _parse_phyints(config_parser: configparser.ConfigParser):
+    """Parse physical interfaces from the configuration."""
+    current_interfaces = kernel.network_interfaces()
+    names = _str_to_list(config_parser.get("phyints", "names", fallback=""))
+    return [_get_interface(current_interfaces, name) for name in names]
+
+
+def _parse_group_address(group_address: str) -> IPv4Address:
+    """Validate and convert group address to IPv4Address object."""
+    group = ip_address(group_address) # TODO - prefix len support
     if not group.is_multicast:
-        raise ValueError(f"invalid group address {group_address}")
+        raise ValueError(f"Invalid group address {group_address}")
 
     return group
 
 
-def _get_phyints(config_parser: configparser.ConfigParser):
-    current_interfaces = kernel.network_interfaces()
-    names = _str_list(config_parser.get("phyints", "names", fallback=""))
-    return [_get_interface(current_interfaces, name) for name in names]
-
-
 def _get_interface(interfaces, name):
+    """Get interface by name and validate it."""
     try:
         interface = interfaces[name]
     except KeyError:
@@ -96,5 +100,21 @@ def _get_interface(interfaces, name):
     return interface
 
 
-def _str_list(str_list: str) -> list[str]:
+def _parse_outgoing_map(to: str) -> dict[str, int]:
+    return {inf: ttl for inf, ttl in
+            (_str_to_key_value(inf_raw) for inf_raw in _str_to_list(to))}
+
+
+def _str_to_key_value(str_pair: str, default_value=1) -> tuple[str, int]:
+    """Convert a key=value string pair to a tuple."""
+    parts = str_pair.split('=')
+    if not parts[0].strip():
+        raise ValueError(f"Invalid key: {str_pair}")
+
+    value = int(parts[1].strip()) if len(parts) > 1 and parts[1].strip().isdigit() else default_value
+    return parts[0].strip(), value
+
+
+def _str_to_list(str_list: str) -> list[str]:
     return [s.strip() for s in str_list.split(',')]
+

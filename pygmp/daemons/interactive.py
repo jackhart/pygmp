@@ -41,7 +41,7 @@ from pygmp.daemons.utils import get_logger
 _logger = get_logger(__name__)
 
 
-def main(args):
+def main(args, app):
 
     with kernel.igmp_socket() as sock:
         _clean(sock)

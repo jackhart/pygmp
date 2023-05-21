@@ -45,6 +45,19 @@ summary () {
 basic () {
   printf "\nCreating basic network...\n"
   ip netns add basic
+
+  # setup veth pair for REST API access
+  ip link add veth0 type veth peer name veth1
+  ip link set veth1 netns basic
+  ip addr add 172.20.0.1/24 dev veth0
+  ip link set veth0 up
+  ip netns exec basic ip addr add 172.20.0.2/24 dev veth1
+  ip netns exec basic ip link set veth1 up
+
+  # setup iptables for veth pair
+  iptables -t nat -A PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 172.20.0.2:8000
+  ip netns exec basic iptables -t nat -A POSTROUTING -p tcp --sport 8000 -j MASQUERADE
+
   ip netns exec basic ip link add a1 type dummy
   ip netns exec basic ip link set a1 up
   ip netns exec basic ip link set a1 multicast on
@@ -61,6 +74,8 @@ basic () {
   ip netns exec basic ip addr add 20.0.0.1/24 dev a2
   ip netns exec basic ip addr add 30.0.0.1/24 dev a3
 
+  ip netns exec basic ip link set lo up
+
   summary basic
 
 }
@@ -69,8 +84,10 @@ main () {
 
   # a basc network setup =============================================
   if [ "$OVERWRITE" == true ] && [ "$(ip netns list | grep -wc "basic")" -eq 1 ]; then
-    echo "Deleting existing basic namespace..."
+    echo "Deleting existing basic namespace and iptable rules..."
+    iptables -t nat -D PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 172.20.0.2:8000
     ip netns delete basic
+    ip link del veth0
   fi
 
   [[ $(ip netns list | grep -wc "basic") -eq 0 ]] && {

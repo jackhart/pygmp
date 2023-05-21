@@ -43,7 +43,7 @@ def main(args):
         module1.extra_compile_args = ["-g", "-O0"]
         module1.extra_link_args = ["-g"]
 
-    setup(ext_modules=[module1])
+    setup(ext_modules=[module1], requires=["fastapi", "uvicorn"])
 
 
 if __name__ == "__main__":
