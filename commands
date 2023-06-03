@@ -6,6 +6,13 @@ python3 pygmp interactive
 
 ip netns exec basic python3 -m pytest tests/test_simple.py
 
+
+nsenter --net=/var/run/netns/basic
+
+sudo capsh --caps="cap_net_raw+eip cap_setpcap,cap_setuid,cap_setgid+ep cap_sys_admin+eip cap_sys_chroot+eip cap_setfcap+eip" --keep=1 --user=jack --addamb=cap_net_raw --addamb=cap_sys_admin --addamb=cap_sys_chroot --addamb=cap_setfcap -- -c "./venv/bin/python3 -m pytest -s"
+
+
+
 ip netns exec basic python3 pygmp smcrouted
 ip netns exec basic ping -c 3 -W 1 -I a3 -t 2 239.0.0.4
 ip netns exec basic ip mroute

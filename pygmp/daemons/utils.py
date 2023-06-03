@@ -24,6 +24,8 @@ from pathlib import Path
 import logging
 import logging.config
 import inspect
+from typing import Any
+
 import pygmp
 import os
 import signal
@@ -54,6 +56,14 @@ class DaemonContext(contextlib.ContextDecorator):
     def __exit__(self, *exc):
         self.pid_file.close()
         return False
+
+
+def search_dict_lists(d: dict[Any, list[Any]], key: Any, value: Any) -> int | None:
+    """Searches a dictionary of lists for an item in list of key. Returns index of item if found, else None."""
+    if key in d:
+        if value in d[key]:
+            return d[key].index(value)
+    return None
 
 
 def _daemon_fork(working_dir: str, umask: int):

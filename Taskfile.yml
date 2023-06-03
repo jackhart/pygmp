@@ -15,6 +15,7 @@ tasks:
     deps: [ install ]
     interactive: true
     cmds:
+      - sudo ./network-setup.sh --overwrite
       - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 pygmp simple {{.CLI_ARGS}}
 
   install:
@@ -24,12 +25,6 @@ tasks:
       - ./venv/bin/pip3 install -e .
     status:
       - '[ -n "$(find ./venv/lib/*/site-packages -type d -name "pygmp-*.dist-info" -print -quit)" ]'
-
-  test:
-    desc: Run pytests.
-    deps: [ install, setup-network ]
-    cmds:
-      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 -m pytest -s {{.CLI_ARGS}}
 
   setup-network:
     desc: Setup the network namespaces for testing.
@@ -45,8 +40,8 @@ tasks:
   make-venv:
     cmds:
       - python3 -m pip install virtualenv
-      - python3 -m venv venv
-      - ./venv/bin/pip3 install --upgrade pip setuptools wheel
+      - python3 -m venv venv --upgrade-deps --copies
+      # - sudo setcap cap_net_admin+ep ./python3
       - ./venv/bin/pip3 install -r dev-requirements.txt
     status:
       - '[ -d ./venv ]'

@@ -1,5 +1,7 @@
+wheel
 pytest
 sphinx
 furo
 flake8
 scapy
+psutil

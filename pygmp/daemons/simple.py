@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from ipaddress import IPv4Address
 import threading
-from pygmp.daemons.utils import get_logger
+from pygmp.daemons.utils import get_logger, search_dict_lists
 from pygmp.daemons.config import load_config, MRoute
 from pygmp import kernel, data
 
@@ -96,14 +96,26 @@ def setup_app(app, vif_manager, mfc_manager, control_msg_handler):
         vif_manager.add(match, mcast_index)
         return vif_manager.vifs()[match.name]
 
-    # TODO - DELETE vif
+    @app.delete("/vifs/{interface_name}")
+    def delete_vif(interface_name_or_index: str | int):
+        if isinstance(interface_name_or_index, str):
+            vif_manager.remove_by_name(interface_name_or_index)
+        else:
+            vif_manager.remove_by_index(interface_name_or_index)
+
     # TODO - POST and DELETE mfc
-    # @app.post("/mfc")
-    # def add_mfc(group: IPv4Address, incoming_interface_address_or_index: str | int, outgoing_interfaces: list[int | str], source: IPv4Address = ipaddress.ip_address(ANY_ADDR)):
-    #     MRoute(from_=iif, to=group, source=source, group=group)
-    #     mfc_manager.add(source, group, iif, oifs)
-    #     return mfc_manager.static_mfc()[iif]
-    #
+    @app.post("/mfc")
+    def add_mfc(mroute: MRoute):
+        mfc_manager.add(mroute)
+        if mroute.source == ANY_ADDR:
+            return mfc_manager.dynamic_mfc()[mroute.from_][-1]
+        return mfc_manager.static_mfc()[mroute.from_][-1]
+
+    @app.delete("/mfc")
+    def delete_mfc(mroute: MRoute):
+        # FIXME - ttl mapping shouldn't matter
+        mfc_manager.remove(mroute)
+
     return app
 
 
@@ -126,8 +138,8 @@ class VifManager:
         """Returns the multicast VIF index for the given interface."""
         try:
             return self._vif_name_list.index(name)
-        except ValueError:
-            raise ValueError(f"Could not find index for Interface {name}.")
+        except ValueError as e:
+            raise ValueError(f"Could not find index for Interface {name}.") from e
 
     def add(self, interf: data.Interface, mcast_index: int | None = None):
         """Adds a virtual multicast interface to the kernel.
@@ -151,8 +163,8 @@ class VifManager:
         """Removes a virtual multicast interface from the kernel by name."""
         try:
             vif_entry = self.vifs()[interface_name]
-        except KeyError:
-            raise ValueError(f"Interface {interface_name} does not exist.")
+        except KeyError as e:
+            raise ValueError(f"Interface {interface_name} does not exist.") from e
         # FIXME - interface vs address
         kernel.del_vif(self.sock, data.VifCtl(vifi=vif_entry.index, lcl_addr=vif_entry.local_addr_or_interface))
 
@@ -160,8 +172,11 @@ class VifManager:
         ttls = [0] * len(self._vif_name_list)
         for inter, ttl in phyints.items():
             if isinstance(inter, str):
-                inter = self._vif_name_list.index(inter)
-            ttls[inter] = ttl
+                inter = self.vifi(inter)
+            try:
+                ttls[inter] = ttl
+            except IndexError as e:
+                raise ValueError(f"Interface of index {inter} does not exist.") from e
         return ttls
 
 
@@ -201,6 +216,8 @@ class MfcManager:
         if str(mroute.source) == ANY_ADDR:
             if self._dynamic_mroutes.get(parent):
                 self._dynamic_mroutes[parent].remove(mroute)
+                if not self._dynamic_mroutes[parent]:
+                    del self._dynamic_mroutes[parent]
             else:
                 raise ValueError(f"Dynamic MRoute {mroute} does not exist.")
         else:

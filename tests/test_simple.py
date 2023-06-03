@@ -82,11 +82,5 @@ def test_mfcmanager_add_duplicate(mfc_manager, example_config):
 def test_mfcmanager_remove(mfc_manager, example_config):
     mfc_manager.remove(example_config.mroute[0])
     mfc_manager.remove(example_config.mroute[1])
-    # FIXME - pop out of the dict
-    print(mfc_manager.static_mfc())
-    print(mfc_manager.dynamic_mfc())
-
-
-def test_control_handler_init():
-    # TODO
-    pass
+    assert len(mfc_manager.static_mfc()) == 0
+    assert len(mfc_manager.dynamic_mfc()) == 0
