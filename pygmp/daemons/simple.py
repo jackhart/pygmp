@@ -39,7 +39,7 @@ BUFFER_SIZE = 6000  # TODO - think through buffer size
 
 
 def main(sock, args, app):
-    config = load_config("/home/jack/Documents/projects/pygmp/tests/simple.ini")  # TODO - cleanup
+    config = load_config("/home/jack/Documents/projects/pygmp/tests/simple_confs/basic1.ini")  # TODO - move
     kernel.flush(sock)
     kernel.disable_pim(sock)
     kernel.enable_mrt(sock)
@@ -205,7 +205,7 @@ class MfcManager:
         if str(mroute.source) == ANY_ADDR:
             vifi = self.vif_manager.vifi(mroute.from_)
             if self._dynamic_mroutes.get(vifi):
-                self._dynamic_mroutes[vifi][self._dynamic_mroutes[vifi].index(mroute)] = mroute
+                self._dynamic_mroutes[vifi][self._dynamic_mroutes[vifi].index(mroute)] = mroute # FIXME throws ValueError
             else:
                 self._dynamic_mroutes[vifi] = [mroute]
         else:

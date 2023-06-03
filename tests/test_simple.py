@@ -1,5 +1,5 @@
 import pytest
-
+from pathlib import Path
 from pygmp import kernel
 from pygmp.daemons import config, simple
 
@@ -10,9 +10,9 @@ def igmp_sock():
         yield sock
 
 
-@pytest.fixture
-def example_config():  # FIXME
-    return config.load_config("/home/jack/Documents/projects/pygmp/tests/simple.ini")
+@pytest.fixture(params=list(Path("/home/jack/Documents/projects/pygmp/tests/simple_confs").glob("*.ini")))
+def example_config(request):  # FIXME
+    return config.load_config(str(request.param))
 
 
 @pytest.fixture
@@ -67,6 +67,7 @@ def test_vifmanager_vifi(vif_manager):
         vif_manager.vifi("a4")
 
 
+
 def test_mfcmanager_init(mfc_manager):
     assert len(mfc_manager.static_mfc()) == 1
     assert len(mfc_manager.dynamic_mfc()) == 1
@@ -84,3 +85,8 @@ def test_mfcmanager_remove(mfc_manager, example_config):
     mfc_manager.remove(example_config.mroute[1])
     assert len(mfc_manager.static_mfc()) == 0
     assert len(mfc_manager.dynamic_mfc()) == 0
+
+
+def test_print(mfc_manager, example_config):
+    print(mfc_manager.static_mfc())
+    print(mfc_manager.dynamic_mfc())

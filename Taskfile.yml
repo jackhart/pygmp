@@ -26,6 +26,12 @@ tasks:
     status:
       - '[ -n "$(find ./venv/lib/*/site-packages -type d -name "pygmp-*.dist-info" -print -quit)" ]'
 
+  test:
+    desc: Run pytests.
+    deps: [ install ]
+    cmds:
+      - sudo {{.USER_WORKING_DIR}}/venv/bin/python3 -m pytest -s {{.CLI_ARGS}}
+
   setup-network:
     desc: Setup the network namespaces for testing.
     cmds:

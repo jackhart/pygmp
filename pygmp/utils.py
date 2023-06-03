@@ -22,6 +22,7 @@
 from __future__ import annotations
 import hashlib
 import socket
+import sys
 from ipaddress import ip_address, IPv4Address, IPv6Address
 
 
@@ -49,6 +50,7 @@ def host_hex_to_ip(hex_val: str) -> IPv4Address | IPv6Address:
     """Convert a hex string in network byte order (big-endian) to IP address object."""
     # Convert hex string to bytes
     net_order = bytes.fromhex(hex_val)
+    net_order = net_order if sys.byteorder == 'big' else net_order[::-1]
 
     if len(net_order) == 4:  # IPv4 address
         return ip_address(socket.inet_ntop(socket.AF_INET, net_order))
