@@ -24,7 +24,7 @@
 import argparse
 
 import kernel
-from pygmp.daemons import interactive, simple
+from pygmp.daemons import simple
 from fastapi import FastAPI
 import uvicorn
 
@@ -32,22 +32,20 @@ import uvicorn
 def build_args():
     # create the top-level parser
     parser = argparse.ArgumentParser(prog='Multicast Routing Daemons and Tools')
-    # parser.add_argument('--foo', action='store_true', help='foo help')
+    parser.add_argument('--host', default="172.20.0.2", help='Host address for REST API')
+    parser.add_argument('--port', default=8000, help='Port for REST API')
+
     subparsers = parser.add_subparsers(required=True, help='The multicast daemon or tool to run.')
 
-    parser_a = subparsers.add_parser('interactive', help=interactive.__doc__)
-    parser_a.set_defaults(daemon=interactive.main)
-    # parser_b.add_argument('--baz', choices='XYZ', help='baz help')
-
-    parser_b = subparsers.add_parser('simple', help='b help')
-    parser_b.set_defaults(daemon=simple.main)
+    parser_a = subparsers.add_parser('simple', help='A simple multicast routing daemon.')
+    parser_a.add_argument('--config', default="/etc/simple.ini", help='Config file for simple multicast routing daemon.')
+    parser_a.set_defaults(daemon=simple.main)
 
     return parser.parse_args()
-
 
 
 if __name__ == "__main__":
     with kernel.igmp_socket() as sock:
         args = build_args()
         app = args.daemon(sock, args, FastAPI())
-        uvicorn.run(app, host="172.20.0.2", port=8000)
+        uvicorn.run(app, host=args.host, port=args.port)

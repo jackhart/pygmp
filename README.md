@@ -28,12 +28,12 @@ Run an example static multicast router implementation
 task run
 ```
 
-In your browser, you should be able to hit `localhost:8000/docs` to see the OpenAPI documentation.
+In your browser, you should be able to hit `http://172.20.0.2:8000/docs` to see the OpenAPI documentation.
 
 
 ### Roadmap
 
-- finalize IPv4 static multicast daemon implementation
+- finalize IPv4 simple multicast daemon implementation
 - CI/CD / semantic versioning / create a pip registry
 - MLD/IPv6 support
 - pimd daemon implementation

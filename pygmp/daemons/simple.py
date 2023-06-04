@@ -39,7 +39,7 @@ BUFFER_SIZE = 6000  # TODO - think through buffer size
 
 
 def main(sock, args, app):
-    config = load_config("/home/jack/Documents/projects/pygmp/tests/simple_confs/basic1.ini")  # TODO - move
+    config = load_config(args.config)
     kernel.flush(sock)
     kernel.disable_pim(sock)
     kernel.enable_mrt(sock)

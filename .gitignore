@@ -22,3 +22,6 @@ cmake-build-debug/
 
 # sphinx
 **/_build/
+
+# scrap work
+scratch.txt

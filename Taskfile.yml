@@ -16,13 +16,13 @@ tasks:
     interactive: true
     cmds:
       - sudo ./network-setup.sh --overwrite
-      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 pygmp simple {{.CLI_ARGS}}
+      - sudo ip netns exec basic {{.USER_WORKING_DIR}}/venv/bin/python3 pygmp simple --config ./tests/simple_confs/basic1.ini
 
   install:
     desc: Build the extension in-place and install.  Adds metadata to venv lib linking source to pygmp directory.
     deps: [ make-venv ]
     cmds:
-      - ./venv/bin/pip3 install -e .
+      - ./venv/bin/pip3 install -e .[daemons]
     status:
       - '[ -n "$(find ./venv/lib/*/site-packages -type d -name "pygmp-*.dist-info" -print -quit)" ]'
 

@@ -27,6 +27,7 @@ import sysconfig
 
 
 def main(args):
+    """This is used to build the C extension.  All metadata is in pyproject.toml.  Do not run this directly."""
 
     python_lib = sysconfig.get_config_var('LDLIBRARY').replace('lib', '').replace('.a', '').replace('.so', '')
     include_dir = sysconfig.get_path('include')
@@ -43,7 +44,7 @@ def main(args):
         module1.extra_compile_args = ["-g", "-O0"]
         module1.extra_link_args = ["-g"]
 
-    setup(ext_modules=[module1], requires=["fastapi", "uvicorn"])
+    setup(ext_modules=[module1])
 
 
 if __name__ == "__main__":

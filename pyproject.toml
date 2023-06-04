@@ -5,12 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pygmp"
 version = "0.0.1"
-description = "Linux Multicast Routing Utilities."
+description = "Linux Multicast Routing."
 readme = "README.md"
-authors = [
-    {name = "Jack Hart", email = "jackhart0508@gmail.com"}
-]
-# license = {file = "./LICENSE"}
+requires-python = ">=3.8"
+authors = [ {name = "Jack Hart", email = "jackhart0508@gmail.com"} ]
+maintainers = [ {name = "Jack Hart", email = "jackhart0508@gmail.com"} ]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Video",
+    "Topic :: System :: Networking",
+    "Topic :: System :: Operating System Kernels :: Linux"
+    ]
+
+license = {file = "./LICENSE"}
+
+[project.optional-dependencies]
+daemons = ["fastapi", "uvicorn"]
 
 [project.urls]
 Source = "https://github.com/jackhart/pygmp"
