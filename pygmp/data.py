@@ -77,9 +77,10 @@ class IGMPType(Enum):
 
 class ControlMsgType(IntEnum):
     """Kernel's control message type"""
-    IGMPMSG_NOCACHE = _kernel.IGMPMSG_NOCACHE  #: Got IGMP message for VIP with no matching multicast cache entry
-    IGMPMSG_WRONGVIF = _kernel.IGMPMSG_WRVIFWHOLE  #: ... TODO
-    IGMPMSG_WHOLEPKT = _kernel.IGMPMSG_WHOLEPKT  #:  ... TODO
+    IGMPMSG_NOCACHE = 1
+    IGMPMSG_WRONGVIF = 2
+    IGMPMSG_WHOLEPKT = 3
+    IGMPMSG_WRVIFWHOLE = 4
 
 
 class InterfaceFlags(IntEnum):
