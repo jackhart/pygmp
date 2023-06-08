@@ -40,7 +40,6 @@ testpaths = [
 ]
 
 [tool.cibuildwheel]
-platform = ["linux"]
 archs = ["auto"]
 test-skip = "true"
 
