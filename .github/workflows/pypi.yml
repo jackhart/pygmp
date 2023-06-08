@@ -21,13 +21,10 @@ jobs:
         with:
           python-version: 'pypy3.9'
 
-      - name: Install dependencies
+      - name: Build Package
         run: |
           python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build Package
-        run: python -m build
+          pip wheel . --no-deps -w dist
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
