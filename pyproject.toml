@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pygmp"
+name = "py-gmp"
 version = "0.0.1"
 description = "Linux Multicast Routing."
 readme = "README.md"
