@@ -171,7 +171,7 @@ class IGMPControl(Base):
     msgtype: ControlMsgType  #: Control message type
     mbz: int  #: Must be zero
     vif: int  #: Low 8 bits of VIF number
-    vif_hi: int  #: High 8 bits of VIF number
+    # vif_hi: int  #: High 8 bits of VIF number
     im_src: IPv4Address | IPv6Address | str   #: IP address of source of packet
     im_dst: IPv4Address | IPv6Address | str   #: IP address of destination of packet
 

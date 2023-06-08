@@ -450,7 +450,7 @@ static PyObject *parse_igmp_control(unsigned char *buffer, size_t len) {
     ADD_ITEM_AND_CHECK(result_dict, "msgtype", PyLong_FromLong(igmp->im_msgtype));
     ADD_ITEM_AND_CHECK(result_dict, "mbz", PyLong_FromLong(igmp->im_mbz));
     ADD_ITEM_AND_CHECK(result_dict, "vif", PyLong_FromLong(igmp->im_vif));
-    ADD_ITEM_AND_CHECK(result_dict, "vif_hi", PyLong_FromLong(igmp->im_vif_hi));
+    // FIXME - doesn't always exist ADD_ITEM_AND_CHECK(result_dict, "vif_hi", PyLong_FromLong(igmp->im_vif_hi));
     ADD_ITEM_AND_CHECK(result_dict, "im_src", inet_ntop_with_exception(AF_INET, &(igmp->im_src)));
     ADD_ITEM_AND_CHECK(result_dict, "im_dst", inet_ntop_with_exception(AF_INET, &(igmp->im_dst)));
 

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools", "wheel", "Cython", "pytest", "pytest-runner", "sphinx", "furo", "flake8", "scapy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -31,3 +31,21 @@ Source = "https://github.com/jackhart/pygmp"
 
 [options]
 packages = ["pygmp"]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+addopts = "-s"
+testpaths = [
+    "tests",
+]
+
+[tool.cibuildwheel]
+build = "*"
+skip = ""
+test-skip = ""
+
+[tool.cibuildwheel]
+platform = ["linux"]
+archs = ["auto"]
+test-skip = "true"
+

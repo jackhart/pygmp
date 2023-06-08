@@ -1,7 +1,7 @@
 # Ignore the dist directory created by setup.py
 dist/
 build/
-pygmp.egg-info/
+py_gmp.egg-info/
 
 # Ignore all .so or .o files in the repository
 *.so

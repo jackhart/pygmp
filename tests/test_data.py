@@ -112,11 +112,11 @@ def test_interface_equivalence():
 
 
 def test_igmp_control(inaddr_str, multicast_addr):
-    igmp_control = data.IGMPControl(data.ControlMsgType.IGMPMSG_NOCACHE, 0, 1, 0, inaddr_str, multicast_addr)
+    igmp_control = data.IGMPControl(data.ControlMsgType.IGMPMSG_NOCACHE, 0, 1, inaddr_str, multicast_addr)
     assert igmp_control.msgtype == data.ControlMsgType.IGMPMSG_NOCACHE
     assert isinstance(igmp_control.msgtype, Enum)
 
-    igmp_control = data.IGMPControl(int(data.ControlMsgType.IGMPMSG_NOCACHE), 0, 1, 0, inaddr_str, multicast_addr)
+    igmp_control = data.IGMPControl(int(data.ControlMsgType.IGMPMSG_NOCACHE), 0, 1, inaddr_str, multicast_addr)
     assert igmp_control.msgtype == data.ControlMsgType.IGMPMSG_NOCACHE
     assert isinstance(igmp_control.msgtype, Enum)
 

@@ -35,8 +35,7 @@ def main(args):
 
     module1 = Extension('pygmp._kernel',
                         sources=["pygmp/_kernel.c", "pygmp/util.c"],
-                        include_dirs=[pygmp_dir, include_dir],
-                        libraries=[python_lib])
+                        include_dirs=[pygmp_dir, include_dir])
 
     if "--debug" in args:
         print("Debug mode")
