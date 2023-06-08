@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/pygmp/
+      url: https://pypi.org/p/py-gmp/
     permissions:
       id-token: write
     steps:
