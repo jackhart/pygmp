@@ -32,6 +32,10 @@ Source = "https://github.com/jackhart/pygmp"
 [options]
 packages = ["pygmp"]
 
+[tool.setuptools.package-data]
+pygmp = ['log_config.ini']
+
+
 [tool.pytest.ini_options]
 pythonpath = "."
 addopts = "-s"

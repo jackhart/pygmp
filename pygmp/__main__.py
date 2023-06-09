@@ -23,10 +23,11 @@
 
 import argparse
 
-import kernel
-from pygmp.daemons import simple
 from fastapi import FastAPI
 import uvicorn
+
+from pygmp import kernel
+from pygmp.daemons import simple
 
 
 def build_args():
