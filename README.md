@@ -38,7 +38,7 @@ sudo python3 -m pygmp simple
 ```
 
 
-## Source
+## Developer Quick Start
 
 Install the [task](https://taskfile.dev/installation) utility.  This utility is used to standardize build and test processes.
 
@@ -46,9 +46,15 @@ Install the [task](https://taskfile.dev/installation) utility.  This utility is 
 task install
 ```
 
+### Test
+
+```bash
+task test
+```
+
 ### IPv4 Static Multicast Routing
 
-Run an example static multicast router implementation
+Run an example simple multicast router in a network namespace.
 ```bash
 task run
 ```
@@ -59,17 +65,15 @@ In your browser, you should be able to hit `http://172.20.0.2:8000/docs` to see 
 ### Roadmap
 
 - finalize IPv4 simple multicast daemon implementation
-- CI/CD / semantic versioning / create a pip registry
+- Improve CI/CD / versioning process / testing / setup readthedocs
 - MLD/IPv6 support
+- Containerized example
 - pimd daemon implementation
-- Dockerized example
-- expand testing to other distros
-
 
 
 #### Host Configuration Gotchas
 
-Most new distibutions set the IGMP version to 3.  To test with IGMPv2, you'll need to set it to 2 and reboot.  Also, make sure mc_forwarding is enabled.  Change the values in `/etc/sysctl.conf`.  Then, reboot.
+Most new Linux distibutions set the IGMP version to 3.  To test with IGMPv2, you'll need to set it to 2 and reboot.  Also, make sure mc_forwarding is enabled.  Change the values in `/etc/sysctl.conf`.  Then, reboot.
 
 ```
 net.ipv4.ip_forward = 1

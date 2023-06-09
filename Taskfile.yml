@@ -11,7 +11,7 @@ tasks:
       - task --list
 
   run:
-    desc: Run the interactive shell.
+    desc: Run the simple routing daemon.
     deps: [ install ]
     interactive: true
     cmds:
