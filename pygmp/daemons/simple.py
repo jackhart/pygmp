@@ -253,7 +253,8 @@ class ControlMessageHandler:
                 mfctl = data.MfcCtl(origin=message.im_src, mcastgroup=message.im_dst, parent=message.vif, ttls=ttls_list)
                 kernel.add_mfc(self.sock, mfctl)
         # TODO - expand support
-        raise ValueError(f"Unknown control message type {message.msgtype}.")
+        else:
+            raise ValueError(f"Unknown control message type {message.msgtype}.")
 
 
 def start_socket_listener(sock, control_message_handler):
