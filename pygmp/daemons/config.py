@@ -62,8 +62,8 @@ def _parse_mroutes(config_parser: configparser.ConfigParser) -> list[MRoute]:
     mroutes = []
     for name in config_parser.sections():
         if name.startswith(_MROUTE_PREFIX):
-            outgoing_interface_dict = _parse_outgoing_map(config_parser.get(name, "to"))
-            group = _parse_group_address(config_parser.get(name, "group"))
+            outgoing_interface_dict = parse_outgoing_map(config_parser.get(name, "to"))
+            group = parse_group(config_parser.get(name, "group"))
             source = ip_address(config_parser.get(name, "source", fallback="0.0.0.0"))
             mroutes.append(MRoute(from_=config_parser.get(name, "from"), group=group,
                                   to=outgoing_interface_dict, source=source))
@@ -77,8 +77,17 @@ def _parse_phyints(config_parser: configparser.ConfigParser):
     return [_get_interface(current_interfaces, name) for name in names]
 
 
-def _parse_group_address(group_address: str) -> IPv4Address:
-    """Validate and convert group address to IPv4Address object."""
+def parse_group(group_address: str) -> IPv4Address | IPv4Network:
+    """Parse a multicast group.
+
+    Accepts either:
+    - A single multicast group address, e.g. ``239.0.0.4``
+    - A multicast prefix, e.g. ``239.0.0.0/24``
+
+    Prefixes are useful for expressing wildcard routes in the simple daemon. Note
+    that Linux kernel MFC entries are per-(S,G), so a prefix cannot be installed
+    directly as a single kernel route.
+    """
     # Supports:
     # - "239.1.0.1" (IPv4Address)
     # - "239.1.0.0/24" (IPv4Network)
@@ -116,19 +125,41 @@ def _get_interface(interfaces, name):
     return interface
 
 
-def _parse_outgoing_map(to: str) -> dict[str, int]:
-    return {inf: ttl for inf, ttl in
-            (_str_to_key_value(inf_raw) for inf_raw in _str_to_list(to))}
+def parse_outgoing_map(to: str) -> dict[str, int]:
+    """Parse the ``to`` field used in the simple daemon config.
+
+    Grammar:
+    - Comma-separated interface entries
+    - Each entry can be either:
+      - ``IFACE`` (defaults to TTL threshold 1)
+      - ``IFACE=TTL`` (TTL must be an int; invalid/missing TTL falls back to 1)
+
+    Examples:
+    - ``to = a2``
+    - ``to = a2=2``
+    - ``to = a2,a3=2``
+    """
+    return {inf: ttl for inf, ttl in (parse_key_value(inf_raw) for inf_raw in _str_to_list(to))}
 
 
-def _str_to_key_value(str_pair: str, default_value=1) -> tuple[str, int]:
-    """Convert a key=value string pair to a tuple."""
+def parse_key_value(str_pair: str, default_value: int = 1) -> tuple[str, int]:
+    """Convert a key=value string pair to a tuple.
+
+    Accepts either ``key`` or ``key=value``. If value is missing or not an int,
+    ``default_value`` is used.
+    """
     parts = str_pair.split('=')
     if not parts[0].strip():
         raise ValueError(f"Invalid key: {str_pair}")
 
     value = int(parts[1].strip()) if len(parts) > 1 and parts[1].strip().isdigit() else default_value
     return parts[0].strip(), value
+
+
+# Backwards-compatible private names (used by older code/tests).
+_parse_group_address = parse_group
+_parse_outgoing_map = parse_outgoing_map
+_str_to_key_value = parse_key_value
 
 
 def _str_to_list(str_list: str) -> list[str]:

@@ -29,6 +29,7 @@ import ipaddress
 from ipaddress import IPv4Address, IPv4Network
 import threading
 from pygmp.daemons.utils import get_logger
+from pygmp.daemons import config as daemon_config
 from pygmp.daemons.config import load_config, MRoute
 from pygmp import kernel, data
 
@@ -58,7 +59,13 @@ def main(sock, args, app):
 def setup_app(app, vif_manager, mfc_manager, control_msg_handler):
     # Avoid importing FastAPI types at module import time so the core library can
     # still be imported without optional daemon dependencies.
-    from fastapi import HTTPException
+    from fastapi import Body, HTTPException
+
+    def _get_or_404(mapping, key, detail: str):
+        try:
+            return mapping[key]
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=detail) from e
 
     @app.get("/vifs")
     def vifs():
@@ -66,10 +73,7 @@ def setup_app(app, vif_manager, mfc_manager, control_msg_handler):
 
     @app.get("/vifs/{interface_name}")
     def vifs_by_name(interface_name: str):
-        try:
-            return vif_manager.vifs()[interface_name]
-        except KeyError as e:
-            raise HTTPException(status_code=404, detail=f"VIF '{interface_name}' not found") from e
+        return _get_or_404(vif_manager.vifs(), interface_name, f"VIF '{interface_name}' not found")
 
     @app.get("/static_mfc")
     def static_mfc():
@@ -77,10 +81,7 @@ def setup_app(app, vif_manager, mfc_manager, control_msg_handler):
 
     @app.get("/static_mfc/{vif_index}")
     def static_mfc_by_vifi(vif_index: int):
-        try:
-            return mfc_manager.static_mfc()[vif_index]
-        except KeyError as e:
-            raise HTTPException(status_code=404, detail=f"No static MFC entries for VIF {vif_index}") from e
+        return _get_or_404(mfc_manager.static_mfc(), vif_index, f"No static MFC entries for VIF {vif_index}")
 
     @app.get("/dynamic_mfc")
     def dynamic_mfc():
@@ -88,10 +89,7 @@ def setup_app(app, vif_manager, mfc_manager, control_msg_handler):
 
     @app.get("/dynamic_mfc/{vif_index}")
     def dynamic_mfc_by_vifi(vif_index: int):
-        try:
-            return mfc_manager.dynamic_mfc()[vif_index]
-        except KeyError as e:
-            raise HTTPException(status_code=404, detail=f"No dynamic routes for VIF {vif_index}") from e
+        return _get_or_404(mfc_manager.dynamic_mfc(), vif_index, f"No dynamic routes for VIF {vif_index}")
 
     @app.post("/vifs")
     def add_vif(interface_address_or_index: IPv4Address | int, mcast_index: int | None = None):
@@ -119,18 +117,39 @@ def setup_app(app, vif_manager, mfc_manager, control_msg_handler):
 
     # TODO - POST and DELETE mfc
     @app.post("/mfc")
-    def add_mfc(mroute: dict):
-        mr = _mroute_from_payload(mroute)
-        mfc_manager.add(mr)
+    def add_mfc(
+        from_: str = Body(..., alias="from"),
+        group: str = Body(...),
+        to: dict[str, int] | str = Body(...),
+        source: str = Body(ANY_ADDR),
+    ):
+        try:
+            group_obj = daemon_config.parse_group(group)
+            to_map = daemon_config.parse_outgoing_map(to) if isinstance(to, str) else {k: int(v) for k, v in to.items()}
+            mr = MRoute(from_=from_, group=group_obj, to=to_map, source=ipaddress.ip_address(source))
+            mfc_manager.add(mr)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+
         # For wildcard routes we only store config; for explicit sources we program the kernel.
         if str(mr.source) == ANY_ADDR:
-            return mr
+            return {"from": mr.from_, "group": str(mr.group), "to": mr.to, "source": str(mr.source)}
         return {"status": "ok"}
 
     @app.delete("/mfc")
-    def delete_mfc(mroute: dict):
-        mr = _mroute_from_payload(mroute)
-        mfc_manager.remove(mr)
+    def delete_mfc(
+        from_: str = Body(..., alias="from"),
+        group: str = Body(...),
+        to: dict[str, int] | str = Body(...),
+        source: str = Body(ANY_ADDR),
+    ):
+        try:
+            group_obj = daemon_config.parse_group(group)
+            to_map = daemon_config.parse_outgoing_map(to) if isinstance(to, str) else {k: int(v) for k, v in to.items()}
+            mr = MRoute(from_=from_, group=group_obj, to=to_map, source=ipaddress.ip_address(source))
+            mfc_manager.remove(mr)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
         return {"status": "ok"}
 
     return app
@@ -349,52 +368,7 @@ def _group_matches(route_group: IPv4Address | IPv4Network, packet_group: IPv4Add
     return str(route_group) == str(packet_group)
 
 
-def _mroute_from_payload(payload: dict) -> MRoute:
-    """Parse a JSON payload into an MRoute.
-
-    Expected keys:
-    - from: incoming interface name (or from_)
-    - group: multicast group (e.g. "239.1.0.1" or "239.1.0.0/24")
-    - to: outgoing map (either a dict {"br0": 1} or a string "br0=1,eth1=1")
-    - source: optional source (default "0.0.0.0")
-    """
-    from_ = payload.get("from", payload.get("from_"))
-    if not from_:
-        raise ValueError("mroute missing 'from'")
-
-    group_raw = payload.get("group")
-    if not group_raw:
-        raise ValueError("mroute missing 'group'")
-
-    group_s = str(group_raw).strip()
-    if "/" in group_s:
-        grp = ipaddress.ip_network(group_s, strict=False)
-        if not isinstance(grp, ipaddress.IPv4Network):
-            raise ValueError("only IPv4 multicast is supported")
-        group_obj: IPv4Address | IPv4Network = grp
-    else:
-        grp = ipaddress.ip_address(group_s)
-        if not isinstance(grp, ipaddress.IPv4Address):
-            raise ValueError("only IPv4 multicast is supported")
-        group_obj = grp
-
-    to_raw = payload.get("to", {})
-    if isinstance(to_raw, str):
-        to: dict[str, int] = {}
-        for part in [p.strip() for p in to_raw.split(",") if p.strip()]:
-            if "=" in part:
-                k, v = part.split("=", 1)
-                to[k.strip()] = int(v.strip() or "1")
-            else:
-                to[part] = 1
-    elif isinstance(to_raw, dict):
-        to = {str(k): int(v) for k, v in to_raw.items()}
-    else:
-        raise ValueError("mroute 'to' must be a dict or string")
-
-    source_raw = payload.get("source", ANY_ADDR)
-    src = ipaddress.ip_address(str(source_raw))
-    if not isinstance(src, ipaddress.IPv4Address):
-        raise ValueError("only IPv4 multicast is supported")
-
-    return MRoute(from_=str(from_), group=group_obj, to=to, source=src)
+#
+# NOTE: REST payload parsing is declared directly in the endpoint signatures above
+# using Body(..., alias="from") etc. Keep the parsing logic centralized in
+# `pygmp.daemons.config` (parse_group/parse_outgoing_map) to avoid drift from INI.

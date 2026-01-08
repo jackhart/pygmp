@@ -18,6 +18,22 @@ Config is INI format:
 - ``[mroute_<name>]`` blocks: each block defines an incoming interface, a multicast group,
   and one or more outgoing interfaces with optional TTL thresholds.
 
+``to`` syntax
+^^^^^^^^^^^^^
+
+The ``to`` field is a **comma-separated** list of outgoing interfaces. Each entry can be either:
+
+- ``IFACE``: defaults TTL threshold to **1**
+- ``IFACE=TTL``: sets TTL threshold explicitly
+
+Example (from tests):
+
+.. code-block:: ini
+
+   to = a2,a3=2
+
+This means forward out ``a2`` with TTL threshold 1 and out ``a3`` with TTL threshold 2.
+
 Example:
 
 .. code-block:: ini
@@ -60,4 +76,17 @@ The daemon exposes endpoints for listing VIFs and MFC entries:
 - ``GET /vifs``
 - ``GET /static_mfc``
 - ``GET /dynamic_mfc``
+
+The daemon also accepts basic route updates:
+
+- ``POST /mfc`` and ``DELETE /mfc`` with a JSON body:
+
+.. code-block:: json
+
+   {
+     "from": "a1",
+     "group": "239.0.0.4",
+     "to": "a2,a3=2",
+     "source": "0.0.0.0"
+   }
 
