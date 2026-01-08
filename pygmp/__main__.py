@@ -23,8 +23,15 @@
 
 import argparse
 
-from fastapi import FastAPI
-import uvicorn
+try:
+    from fastapi import FastAPI
+    import uvicorn
+except ModuleNotFoundError as e:
+    raise SystemExit(
+        "Missing optional dependencies for daemon support.\n\n"
+        "Install with:\n"
+        "  pip install 'py-gmp[daemons]'\n"
+    ) from e
 
 from pygmp import kernel
 from pygmp.daemons import simple

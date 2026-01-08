@@ -12,5 +12,6 @@ Welcome to pygmp's documentation!
    :maxdepth: 1
 
    pygmp
+   daemons
    GitHub repository <https://github.com/jackhart>
 

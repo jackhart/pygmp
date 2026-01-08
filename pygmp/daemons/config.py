@@ -20,9 +20,11 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 from __future__ import annotations
+
 import configparser
-from ipaddress import ip_address, IPv4Address
+import ipaddress
 from dataclasses import dataclass
+from ipaddress import ip_address, IPv4Address, IPv4Network
 
 from pygmp import kernel, data
 
@@ -35,7 +37,7 @@ _MROUTE_PREFIX = "mroute_"
 class MRoute:
     """Represents a multicast route."""
     from_: str
-    group: IPv4Address
+    group: IPv4Address | IPv4Network
     to: dict[str, int]
     source: IPv4Address = _DEFAULT_SOURCE
 
@@ -77,10 +79,24 @@ def _parse_phyints(config_parser: configparser.ConfigParser):
 
 def _parse_group_address(group_address: str) -> IPv4Address:
     """Validate and convert group address to IPv4Address object."""
-    group = ip_address(group_address) # TODO - prefix len support
+    # Supports:
+    # - "239.1.0.1" (IPv4Address)
+    # - "239.1.0.0/24" (IPv4Network)
+    group_address = group_address.strip()
+    if "/" in group_address:
+        net = ipaddress.ip_network(group_address, strict=False)
+        if not isinstance(net, IPv4Network):
+            raise ValueError(f"Only IPv4 multicast is supported (got {group_address}).")
+        # Multicast is 224.0.0.0/4; ensure the whole range stays multicast.
+        if not (net.network_address.is_multicast and net.broadcast_address.is_multicast):
+            raise ValueError(f"Invalid multicast group prefix {group_address}")
+        return net
+
+    group = ip_address(group_address)
+    if not isinstance(group, IPv4Address):
+        raise ValueError(f"Only IPv4 multicast is supported (got {group_address}).")
     if not group.is_multicast:
         raise ValueError(f"Invalid group address {group_address}")
-
     return group
 
 
@@ -116,5 +132,6 @@ def _str_to_key_value(str_pair: str, default_value=1) -> tuple[str, int]:
 
 
 def _str_to_list(str_list: str) -> list[str]:
-    return [s.strip() for s in str_list.split(',')]
+    # Filter empty entries so defaults like "" don't yield [""].
+    return [s.strip() for s in str_list.split(',') if s.strip()]
 

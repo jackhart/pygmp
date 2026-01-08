@@ -4,7 +4,7 @@ Python interface and services for Linux multicast routing.
 
 
 ## Limitations / Roadmap
-This is a work in progress.  Currently, only IPv4 multicast routing is supported.  The software has only been tested on Ubuntu 20.04, and is not garenteed to work on other distros.  The only implementation thus far is a simple, IPv4, static multicast router with a REST API.
+This is a work in progress.  Currently, only IPv4 multicast routing is supported.  The software has only been tested on Ubuntu 20.04, and is not guaranteed to work on other distros.  The only implementation thus far is a simple, IPv4, static multicast router with a REST API.
 
 
 ## Quick Start
@@ -19,7 +19,7 @@ pip install py-gmp[daemons]
 
 Setup the simple daemon's config file.  The default location for the file is at `/etc/simple.ini`.
 
-For example, say I have two network interfaces: eth0 and br0.  I'd like route all incoming multicast for groups `239.1.0.1/24` on the eth device to the bridge.  The config file would look like this.
+For example, say I have two network interfaces: eth0 and br0.  I'd like route all incoming multicast for groups `239.1.0.0/24` on the eth device to the bridge.  The config file would look like this.
 
 ```ini
 [phyints]
@@ -27,8 +27,8 @@ names=eth0,br0
 
 [mroute_1]
 from = eth0
-group = 239.1.0.1/24
-to = br0
+group = 239.1.0.0/24
+to = br0=1
 ```
 
 Next, start the daemon.
