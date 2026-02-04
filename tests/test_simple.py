@@ -10,8 +10,8 @@ def igmp_sock():
         yield sock
 
 
-@pytest.fixture(params=list(Path("/home/jack/Documents/projects/pygmp/tests/simple_confs").glob("*.ini")))
-def example_config(request):  # FIXME
+@pytest.fixture(params=list(Path(__file__).parent.joinpath("simple_confs").glob("*.ini")))
+def example_config(request):
     return config.load_config(str(request.param))
 
 

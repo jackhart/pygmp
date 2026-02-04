@@ -1,4 +1,16 @@
-"""Entrypoint for multicast routing daemon implementations."""
+"""Entrypoint for multicast routing daemon implementations.
+
+Usage::
+
+    # Run in foreground (default)
+    sudo python3 -m pygmp simple --config /etc/simple.ini
+
+    # Run as a background daemon
+    sudo python3 -m pygmp --daemon simple --config /etc/simple.ini
+
+    # Specify host and port for the REST API
+    sudo python3 -m pygmp --host 0.0.0.0 --port 9000 simple --config /etc/simple.ini
+"""
 #  MIT License
 #
 #  Copyright (c) 2023 Jack Hart
@@ -22,6 +34,7 @@
 #  SOFTWARE.
 
 import argparse
+import sys
 
 from fastapi import FastAPI
 import uvicorn
@@ -31,22 +44,43 @@ from pygmp.daemons import simple
 
 
 def build_args():
-    # create the top-level parser
-    parser = argparse.ArgumentParser(prog='Multicast Routing Daemons and Tools')
-    parser.add_argument('--host', default="172.20.0.2", help='Host address for REST API')
-    parser.add_argument('--port', default=8000, help='Port for REST API')
+    """Build and parse command-line arguments.
 
-    subparsers = parser.add_subparsers(required=True, help='The multicast daemon or tool to run.')
+    Returns:
+        Parsed argparse.Namespace with all CLI options.
+    """
+    parser = argparse.ArgumentParser(
+        prog='pygmp',
+        description='Python IPv4 Multicast Routing Daemon with REST API')
+    parser.add_argument('--host', default="0.0.0.0",
+                        help='Host address for the REST API (default: 0.0.0.0)')
+    parser.add_argument('--port', default=8000, type=int,
+                        help='Port for the REST API (default: 8000)')
+    parser.add_argument('--daemon', action='store_true', default=False,
+                        help='Run as a background daemon (double-fork)')
 
-    parser_a = subparsers.add_parser('simple', help='A simple multicast routing daemon.')
-    parser_a.add_argument('--config', default="/etc/simple.ini", help='Config file for simple multicast routing daemon.')
-    parser_a.set_defaults(daemon=simple.main)
+    subparsers = parser.add_subparsers(required=True,
+                                       help='The multicast daemon or tool to run.')
+
+    parser_simple = subparsers.add_parser('simple',
+                                          help='A simple static multicast routing daemon.')
+    parser_simple.add_argument('--config', default="/etc/simple.ini",
+                               help='Path to INI config file (default: /etc/simple.ini)')
+    parser_simple.set_defaults(daemon_main=simple.main)
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-    with kernel.igmp_socket() as sock:
-        args = build_args()
-        app = args.daemon(sock, args, FastAPI())
-        uvicorn.run(app, host=args.host, port=args.port)
+    args = build_args()
+
+    if args.daemon:
+        from pygmp.daemons.utils import DaemonContext
+        with DaemonContext():
+            with kernel.igmp_socket() as sock:
+                app = args.daemon_main(sock, args, FastAPI())
+                uvicorn.run(app, host=args.host, port=args.port)
+    else:
+        with kernel.igmp_socket() as sock:
+            app = args.daemon_main(sock, args, FastAPI())
+            uvicorn.run(app, host=args.host, port=args.port)
